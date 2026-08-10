@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/BU-Neuromics/gosf/internal/manifest"
+	"github.com/BU-Neuromics/datapin/internal/manifest"
 )
 
 // ---- helpers ----

@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/BU-Neuromics/gosf/internal/gitutil"
+	"github.com/BU-Neuromics/datapin/internal/gitutil"
 )
 
 // CheckState is a node's checkbox state.

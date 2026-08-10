@@ -8,7 +8,7 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 
-	"github.com/BU-Neuromics/gosf/internal/log"
+	"github.com/BU-Neuromics/datapin/internal/log"
 )
 
 // Manifest is the in-memory representation of gosf.toml.

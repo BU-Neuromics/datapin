@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
-	"github.com/BU-Neuromics/gosf/internal/manifest"
-	"github.com/BU-Neuromics/gosf/internal/resolver"
+	"github.com/BU-Neuromics/datapin/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/manifest"
+	"github.com/BU-Neuromics/datapin/internal/resolver"
 )
 
 func mkfile(name string) client.FileItem {

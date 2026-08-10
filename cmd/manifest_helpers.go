@@ -7,10 +7,10 @@ import (
 	"io"
 	"os"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
-	"github.com/BU-Neuromics/gosf/internal/log"
-	"github.com/BU-Neuromics/gosf/internal/manifest"
-	"github.com/BU-Neuromics/gosf/internal/resolver"
+	"github.com/BU-Neuromics/datapin/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/log"
+	"github.com/BU-Neuromics/datapin/internal/manifest"
+	"github.com/BU-Neuromics/datapin/internal/resolver"
 )
 
 // computeLocalMD5 returns the lowercase hex MD5 of the file at path.

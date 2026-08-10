@@ -12,12 +12,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
-	"github.com/BU-Neuromics/gosf/internal/config"
-	"github.com/BU-Neuromics/gosf/internal/gitutil"
-	"github.com/BU-Neuromics/gosf/internal/manifest"
-	"github.com/BU-Neuromics/gosf/internal/output"
-	"github.com/BU-Neuromics/gosf/internal/picker"
+	"github.com/BU-Neuromics/datapin/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/config"
+	"github.com/BU-Neuromics/datapin/internal/gitutil"
+	"github.com/BU-Neuromics/datapin/internal/manifest"
+	"github.com/BU-Neuromics/datapin/internal/output"
+	"github.com/BU-Neuromics/datapin/internal/picker"
 )
 
 var (

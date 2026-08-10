@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/BU-Neuromics/gosf/internal/gitutil"
+	"github.com/BU-Neuromics/datapin/internal/gitutil"
 )
 
 func sampleTree() *Node {

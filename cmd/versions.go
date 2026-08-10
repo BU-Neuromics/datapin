@@ -6,11 +6,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
-	"github.com/BU-Neuromics/gosf/internal/config"
-	"github.com/BU-Neuromics/gosf/internal/log"
-	"github.com/BU-Neuromics/gosf/internal/output"
-	"github.com/BU-Neuromics/gosf/internal/resolver"
+	"github.com/BU-Neuromics/datapin/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/config"
+	"github.com/BU-Neuromics/datapin/internal/log"
+	"github.com/BU-Neuromics/datapin/internal/output"
+	"github.com/BU-Neuromics/datapin/internal/resolver"
 )
 
 var versionsCmd = &cobra.Command{

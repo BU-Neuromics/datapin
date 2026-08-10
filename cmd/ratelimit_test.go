@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/client"
 )
 
 // A bare "OSF API 429: Request was throttled." tells the user nothing they can

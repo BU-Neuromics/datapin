@@ -17,13 +17,13 @@ import (
 
 	"golang.org/x/term"
 
-	"github.com/BU-Neuromics/gosf/internal/config"
-	"github.com/BU-Neuromics/gosf/internal/output"
+	"github.com/BU-Neuromics/datapin/internal/config"
+	"github.com/BU-Neuromics/datapin/internal/output"
 )
 
 const (
 	defaultAPIURL = "https://api.github.com/repos/BU-Neuromics/gosf/releases/latest"
-	releasesURL   = "https://github.com/BU-Neuromics/gosf/releases/latest"
+	releasesURL   = "https://github.com/BU-Neuromics/datapin/releases/latest"
 	checkInterval = 24 * time.Hour
 	httpTimeout   = 1500 * time.Millisecond
 )

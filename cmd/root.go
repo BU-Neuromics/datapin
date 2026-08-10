@@ -12,13 +12,13 @@ import (
 	"github.com/spf13/viper"
 	"golang.org/x/term"
 
-	"github.com/BU-Neuromics/gosf/internal/config"
-	"github.com/BU-Neuromics/gosf/internal/log"
-	"github.com/BU-Neuromics/gosf/internal/output"
-	"github.com/BU-Neuromics/gosf/internal/update"
+	"github.com/BU-Neuromics/datapin/internal/config"
+	"github.com/BU-Neuromics/datapin/internal/log"
+	"github.com/BU-Neuromics/datapin/internal/output"
+	"github.com/BU-Neuromics/datapin/internal/update"
 )
 
-// version is set at build time via -ldflags "-X github.com/BU-Neuromics/gosf/cmd.version=vX.Y.Z"
+// version is set at build time via -ldflags "-X github.com/BU-Neuromics/datapin/cmd.version=vX.Y.Z"
 var version = "dev"
 
 // Global flag values shared across commands.

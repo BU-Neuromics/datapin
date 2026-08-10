@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
-	"github.com/BU-Neuromics/gosf/internal/log"
+	"github.com/BU-Neuromics/datapin/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/log"
 )
 
 // friendlyAuthError converts a raw 401/403 from a read command (ls/info/pull/

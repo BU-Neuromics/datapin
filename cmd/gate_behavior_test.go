@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/BU-Neuromics/gosf/internal/manifest"
+	"github.com/BU-Neuromics/datapin/internal/manifest"
 )
 
 // These paths return before any network client is dereferenced, so nil clients

@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
-	"github.com/BU-Neuromics/gosf/internal/log"
-	"github.com/BU-Neuromics/gosf/internal/manifest"
+	"github.com/BU-Neuromics/datapin/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/log"
+	"github.com/BU-Neuromics/datapin/internal/manifest"
 )
 
 // wikiEntryPlan is the classified, not-yet-executed reconciliation of one wiki

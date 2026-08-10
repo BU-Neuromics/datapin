@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/client"
 )
 
 // fakeLister implements FileLister with an in-memory tree.

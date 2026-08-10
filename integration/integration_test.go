@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/BU-Neuromics/gosf/internal/testutil/fakeosf"
+	"github.com/BU-Neuromics/datapin/internal/testutil/fakeosf"
 )
 
 // binaryPath is set once in TestMain and shared across all tests.

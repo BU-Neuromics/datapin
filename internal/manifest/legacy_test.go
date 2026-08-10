@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/BU-Neuromics/gosf/internal/manifest"
+	"github.com/BU-Neuromics/datapin/internal/manifest"
 )
 
 // A manifest written by gosf ≤1.9 carries a `direction` key on every entry.

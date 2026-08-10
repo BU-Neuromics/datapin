@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/client"
 )
 
 // countingLister records how many times each backing call is made.

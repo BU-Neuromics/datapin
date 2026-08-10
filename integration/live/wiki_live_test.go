@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/client"
 )
 
 // uniqueWikiPage returns a namespaced page name and registers cleanup that

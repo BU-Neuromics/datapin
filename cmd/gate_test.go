@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/BU-Neuromics/gosf/internal/manifest"
+	"github.com/BU-Neuromics/datapin/internal/manifest"
 )
 
 func TestLatestRemoteVersionInfo(t *testing.T) {

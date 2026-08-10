@@ -3,7 +3,7 @@ package cmd
 import (
 	"testing"
 
-	"github.com/BU-Neuromics/gosf/internal/manifest"
+	"github.com/BU-Neuromics/datapin/internal/manifest"
 )
 
 // syncDecision is the whole of sync's policy: every state has exactly one

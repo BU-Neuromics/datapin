@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/BU-Neuromics/gosf/internal/log"
+	"github.com/BU-Neuromics/datapin/internal/log"
 )
 
 // OSF throttles: roughly 100 requests/hour unauthenticated and 10,000/day

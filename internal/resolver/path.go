@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/client"
 )
 
 // Target holds the parsed components of an OSF path argument like

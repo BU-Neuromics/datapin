@@ -5,9 +5,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/BU-Neuromics/gosf/internal/log"
-	"github.com/BU-Neuromics/gosf/internal/manifest"
-	"github.com/BU-Neuromics/gosf/internal/output"
+	"github.com/BU-Neuromics/datapin/internal/log"
+	"github.com/BU-Neuromics/datapin/internal/manifest"
+	"github.com/BU-Neuromics/datapin/internal/output"
 )
 
 var initCmd = &cobra.Command{

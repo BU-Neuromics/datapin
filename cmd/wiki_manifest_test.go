@@ -7,9 +7,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
-	"github.com/BU-Neuromics/gosf/internal/manifest"
-	"github.com/BU-Neuromics/gosf/internal/testutil/fakeosf"
+	"github.com/BU-Neuromics/datapin/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/manifest"
+	"github.com/BU-Neuromics/datapin/internal/testutil/fakeosf"
 )
 
 func md5of(s string) string {

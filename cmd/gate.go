@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
-	"github.com/BU-Neuromics/gosf/internal/manifest"
+	"github.com/BU-Neuromics/datapin/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/manifest"
 )
 
 // entryPlan is the classified, not-yet-executed reconciliation of one manifest

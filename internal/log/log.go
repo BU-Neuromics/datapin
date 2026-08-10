@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/BU-Neuromics/gosf/internal/output"
+	"github.com/BU-Neuromics/datapin/internal/output"
 )
 
 func defaultNow() time.Time { return time.Now() }
