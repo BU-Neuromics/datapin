@@ -1,0 +1,2 @@
+POST https://sandbox.zenodo.org/api/records/585303/draft/files
+[{"key":"never-uploaded.bin"}]

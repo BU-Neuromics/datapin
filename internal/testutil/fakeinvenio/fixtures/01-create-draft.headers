@@ -1,0 +1,22 @@
+HTTP/1.1 201 CREATED
+server: nginx
+date: Mon, 10 Aug 2026 23:33:50 GMT
+content-type: application/json
+content-length: 2533
+etag: "5"
+set-cookie: csrftoken=REDACTED; Expires=Mon, 17 Aug 2026 23:33:50 GMT; Max-Age=604800; Secure; Path=/; SameSite=Lax
+access-control-allow-origin: *
+access-control-expose-headers: Content-Type, ETag, Link, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset
+x-ratelimit-limit: 133
+x-ratelimit-remaining: 131
+x-ratelimit-reset: 1786404861
+retry-after: 30
+permissions-policy: interest-cohort=()
+x-frame-options: sameorigin
+x-xss-protection: 1; mode=block
+x-content-type-options: nosniff
+content-security-policy: default-src 'self' fonts.googleapis.com *.gstatic.com data: 'unsafe-inline' 'unsafe-eval' blob: zenodo-broker.web.cern.ch zenodo-broker-qa.web.cern.ch maxcdn.bootstrapcdn.com cdnjs.cloudflare.com ajax.googleapis.com webanalytics.web.cern.ch
+strict-transport-security: max-age=31556926; includeSubDomains
+referrer-policy: strict-origin-when-cross-origin
+x-source: ui
+
