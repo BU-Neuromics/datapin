@@ -18,9 +18,9 @@ var lsCmd = &cobra.Command{
 	Long: `List files and folders at the given OSF path.
 
 Examples:
-  gosf ls abc12                  # list root of project abc12
-  gosf ls abc12:/data            # list the /data folder
-  gosf ls abc12/xyz34:/results   # list /results in component xyz34`,
+  datapin ls abc12                  # list root of project abc12
+  datapin ls abc12:/data            # list the /data folder
+  datapin ls abc12/xyz34:/results   # list /results in component xyz34`,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {

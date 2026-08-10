@@ -18,8 +18,8 @@ var wikiVersionsCmd = &cobra.Command{
 	Long: `List all versions of a wiki page, newest first.
 
 Examples:
-  gosf wiki versions abc12:home
-  gosf wiki versions abc12:home --output=json`,
+  datapin wiki versions abc12:home
+  datapin wiki versions abc12:home --output=json`,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {

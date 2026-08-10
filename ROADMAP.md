@@ -6,22 +6,22 @@ management, permissions, and project administration are out of scope.
 
 ## v1.1 — File operations and node metadata — Released (v1.1.0)
 
-**Status:** ✅ Released 2026-06-05 ([`v1.1.0`](https://github.com/BU-Neuromics/gosf/releases/tag/v1.1.0)). All four commands below are shipped.
+**Status:** ✅ Released 2026-06-05 ([`v1.1.0`](https://github.com/BU-Neuromics/datapin/releases/tag/v1.1.0)). All four commands below are shipped.
 
 Builds on infrastructure already in place (Waterbutler client, OSF metadata
 client) with minimal new API surface.
 
 | Command | Description |
 |---------|-------------|
-| `gosf mv <src> <dest>` | Rename or move a file or folder within OSF Storage |
-| `gosf cp <src> <dest>` | Copy a file or folder (across projects supported) |
-| `gosf mkdir <project>:<path>` | Create a folder in OSF Storage |
-| `gosf set <project> [flags]` | Update node title, description, category, or tags |
+| `datapin mv <src> <dest>` | Rename or move a file or folder within OSF Storage |
+| `datapin cp <src> <dest>` | Copy a file or folder (across projects supported) |
+| `datapin mkdir <project>:<path>` | Create a folder in OSF Storage |
+| `datapin set <project> [flags]` | Update node title, description, category, or tags |
 
-`gosf mv` updates `gosf.toml` automatically if the moved path has a manifest
+`datapin mv` updates `datapin.toml` automatically if the moved path has a manifest
 entry.
 
-`gosf set` flags: `--title`, `--description`, `--category`, `--tags`.
+`datapin set` flags: `--title`, `--description`, `--category`, `--tags`.
 
 ## v1.2 — Wiki and components
 
@@ -30,13 +30,13 @@ and test coverage.
 
 | Command | Description |
 |---------|-------------|
-| `gosf wiki ls <project>` | List wiki pages |
-| `gosf wiki get <project> <page>` | Print wiki page content |
-| `gosf wiki set <project> <page>` | Create or update a wiki page (`--file` or `--message`) |
-| `gosf mkproject [parent] --title <t>` | Create a top-level project, or a sub-component when a parent GUID is given |
+| `datapin wiki ls <project>` | List wiki pages |
+| `datapin wiki get <project> <page>` | Print wiki page content |
+| `datapin wiki set <project> <page>` | Create or update a wiki page (`--file` or `--message`) |
+| `datapin mkproject [parent] --title <t>` | Create a top-level project, or a sub-component when a parent GUID is given |
 
 ## Later / under consideration
 
 - CEDAR / custom file metadata (`/cedar_metadata_records/`)
 - Comments (`POST /nodes/{id}/comments/`)
-- `gosf status --remote-newer` CI mode (fail only on REMOTE_NEWER)
+- `datapin status --remote-newer` CI mode (fail only on REMOTE_NEWER)

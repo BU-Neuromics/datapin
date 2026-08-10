@@ -18,8 +18,8 @@ var wikiLsCmd = &cobra.Command{
 	Long: `List the wiki pages of an OSF project, most recently modified first.
 
 Examples:
-  gosf wiki ls abc12
-  gosf wiki ls abc12 --output=json`,
+  datapin wiki ls abc12
+  datapin wiki ls abc12 --output=json`,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {

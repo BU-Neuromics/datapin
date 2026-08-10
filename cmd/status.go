@@ -28,7 +28,7 @@ var statusCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		manifestPath, repoRoot, err := manifest.FindManifest()
 		if manifest.IsNotFound(err) {
-			return fmt.Errorf("no .gosf/gosf.toml found — run 'gosf init <project-id>' to start tracking this repo, then 'gosf add' / 'gosf pull' to register files")
+			return fmt.Errorf("no .datapin/datapin.toml found — run 'datapin init <project-id>' to start tracking this repo, then 'datapin add' / 'datapin pull' to register files")
 		}
 		if err != nil {
 			return err

@@ -107,7 +107,7 @@ func canSkipWikiHistory(localMD5, latestMD5 string, latestNum int, entry manifes
 }
 
 // fetchWikiRemoteState resolves a wiki entry's remote page and returns it along
-// with the remote versions (numbers + gosf-computed MD5s) needed to classify it.
+// with the remote versions (numbers + datapin-computed MD5s) needed to classify it.
 // Latest content is fetched once via the content endpoint; older versions are
 // hashed only when the latest/baseline fast path does not settle the
 // classification. A nil page means the entry's page does not exist remotely.

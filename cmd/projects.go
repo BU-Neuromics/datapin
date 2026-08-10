@@ -17,12 +17,12 @@ var projectsCmd = &cobra.Command{
 	Short: "List your OSF projects",
 	Long: `List all OSF projects and components accessible to the authenticated user.
 
-Requires a valid token (set via 'gosf auth login', --token flag, or OSF_TOKEN).`,
+Requires a valid token (set via 'datapin auth login', --token flag, or OSF_TOKEN).`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		token := config.LoadToken(flagToken)
 		if token == "" {
-			return fmt.Errorf("projects requires authentication — run 'gosf auth login' or set OSF_TOKEN")
+			return fmt.Errorf("projects requires authentication — run 'datapin auth login' or set OSF_TOKEN")
 		}
 
 		c := client.New(token)
@@ -30,7 +30,7 @@ Requires a valid token (set via 'gosf auth login', --token flag, or OSF_TOKEN).`
 		nodes, err := c.GetUserNodes(cmd.Context())
 		if err != nil {
 			if apiErr, ok := err.(*client.APIError); ok && apiErr.StatusCode == 401 {
-				return fmt.Errorf("invalid token — run 'gosf auth login' to re-authenticate")
+				return fmt.Errorf("invalid token — run 'datapin auth login' to re-authenticate")
 			}
 			return err
 		}

@@ -12,17 +12,17 @@ import (
 )
 
 const (
-	keychainService = "gosf"
+	keychainService = "datapin"
 	keychainUser    = "token"
 )
 
-// ConfigDir returns the gosf config directory path (~/.config/gosf).
+// ConfigDir returns the datapin config directory path (~/.config/datapin).
 func ConfigDir() (string, error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, "gosf"), nil
+	return filepath.Join(dir, "datapin"), nil
 }
 
 func configFilePath() (string, error) {
@@ -33,7 +33,7 @@ func configFilePath() (string, error) {
 	return filepath.Join(dir, "config.toml"), nil
 }
 
-// tokenFilePath returns the path to the dedicated token file (~/.config/gosf/token).
+// tokenFilePath returns the path to the dedicated token file (~/.config/datapin/token).
 // The token is stored here rather than in config.toml so that config.toml
 // remains safe to commit to version control (e.g. in a dotfiles repository).
 func tokenFilePath() (string, error) {
@@ -44,7 +44,7 @@ func tokenFilePath() (string, error) {
 	return filepath.Join(dir, "token"), nil
 }
 
-// InitViper configures viper to read from ~/.config/gosf/config.toml.
+// InitViper configures viper to read from ~/.config/datapin/config.toml.
 // Missing config file is not an error.
 func InitViper() error {
 	dir, err := ConfigDir()
@@ -86,7 +86,7 @@ func LoadToken(flagToken string) string {
 }
 
 // SaveToken stores the token. It tries the OS keychain first unless
-// noKeychain is true, falling back to the dedicated token file (~/.config/gosf/token).
+// noKeychain is true, falling back to the dedicated token file (~/.config/datapin/token).
 func SaveToken(token string, noKeychain bool) error {
 	if !noKeychain {
 		if err := keyring.Set(keychainService, keychainUser, token); err == nil {
@@ -98,7 +98,7 @@ func SaveToken(token string, noKeychain bool) error {
 }
 
 // DeleteToken removes the stored token from the token file and, best-effort,
-// from the OS keychain. The token file is the store gosf controls directly, so a
+// from the OS keychain. The token file is the store datapin controls directly, so a
 // keychain error (e.g. a locked/unavailable keychain on a headless/HPC system)
 // is returned as a non-fatal warning rather than failing logout — the file is
 // still removed. Only a genuine file-removal failure is a hard error. A missing
@@ -118,7 +118,7 @@ func DeleteToken() (warning string, err error) {
 	return warning, nil
 }
 
-// writeTokenToFile writes the token to ~/.config/gosf/token with 0600 permissions.
+// writeTokenToFile writes the token to ~/.config/datapin/token with 0600 permissions.
 func writeTokenToFile(token string) error {
 	p, err := tokenFilePath()
 	if err != nil {
@@ -130,7 +130,7 @@ func writeTokenToFile(token string) error {
 	return os.WriteFile(p, []byte(token), 0600)
 }
 
-// readTokenFromFile reads the token from ~/.config/gosf/token.
+// readTokenFromFile reads the token from ~/.config/datapin/token.
 // Returns empty string if the file does not exist or cannot be read.
 func readTokenFromFile() string {
 	p, err := tokenFilePath()

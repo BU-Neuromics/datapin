@@ -1,35 +1,35 @@
 ---
-name: gosf
-description: "Use when working with the Open Science Framework (OSF) for research data management. Invoke when: the project contains a .gosf/gosf.toml manifest; the user mentions OSF, osf.io, or osfclient; the task involves syncing, pushing, or pulling research data files with an OSF project; the task involves an OSF project wiki or its markdown pages; or you need to inspect, manage, or automate files stored in OSF Storage. Covers the full gosf CLI: manifest management (gosf init / add / status / sync), file transfer (gosf pull / push / rm), storage management (gosf mkdir / mv / cp), project navigation (gosf ls / info / projects / versions / open / set), project wikis (gosf wiki ls / get / push / rm / mv / versions / open / add), and authentication (gosf auth)."
+name: datapin
+description: "Use when working with the Open Science Framework (OSF) for research data management. Invoke when: the project contains a .datapin/datapin.toml manifest; the user mentions OSF, osf.io, or osfclient; the task involves syncing, pushing, or pulling research data files with an OSF project; the task involves an OSF project wiki or its markdown pages; or you need to inspect, manage, or automate files stored in OSF Storage. Covers the full datapin CLI: manifest management (datapin init / add / status / sync), file transfer (datapin pull / push / rm), storage management (datapin mkdir / mv / cp), project navigation (datapin ls / info / projects / versions / open / set), project wikis (datapin wiki ls / get / push / rm / mv / versions / open / add), and authentication (datapin auth)."
 metadata:
   version: "2.0.0"
 ---
 
-# gosf — Open Science Framework CLI
+# datapin — Open Science Framework CLI
 
-`gosf` is a single-binary CLI for pushing, pulling, and syncing files with
+`datapin` is a single-binary CLI for pushing, pulling, and syncing files with
 the [Open Science Framework](https://osf.io) (OSF). It replaces the
 unmaintained Python `osfclient`.
 
 ## Installation
 
-If `gosf` is not already on `PATH` (`gosf --version` to check), install it:
+If `datapin` is not already on `PATH` (`datapin --version` to check), install it:
 
 ```bash
 # Linux / macOS — downloads the right binary, verifies the checksum
-curl -fsSL https://raw.githubusercontent.com/BU-Neuromics/gosf/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/BU-Neuromics/datapin/main/install.sh | bash
 
 # With Go
-go install github.com/BU-Neuromics/gosf@latest
+go install github.com/BU-Neuromics/datapin@latest
 ```
 
 ```powershell
 # Windows (PowerShell)
-irm https://raw.githubusercontent.com/BU-Neuromics/gosf/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/BU-Neuromics/datapin/main/install.ps1 | iex
 ```
 
 Or download a prebuilt archive from
-<https://github.com/BU-Neuromics/gosf/releases> and put `gosf` on `PATH`. It is a
+<https://github.com/BU-Neuromics/datapin/releases> and put `datapin` on `PATH`. It is a
 static binary with no runtime dependencies — suitable for HPC nodes.
 
 ## Authentication
@@ -38,13 +38,13 @@ Public projects are readable without auth. A token is needed for private
 projects or any write. Tokens are resolved in priority order:
 1. `--token` flag
 2. `OSF_TOKEN` environment variable
-3. `~/.config/gosf/token` (written by `gosf auth login --no-keychain`)
-4. OS keychain (written by `gosf auth login`)
+3. `~/.config/datapin/token` (written by `datapin auth login --no-keychain`)
+4. OS keychain (written by `datapin auth login`)
 
-Check status: `gosf auth status`  ·  Log in: `gosf auth login`  ·  Log out: `gosf auth logout`
+Check status: `datapin auth status`  ·  Log in: `datapin auth login`  ·  Log out: `datapin auth logout`
 
 On HPC/headless systems without a keychain, use `OSF_TOKEN` or `--no-keychain`.
-`gosf auth logout` is best-effort on the keychain: it always removes the token
+`datapin auth logout` is best-effort on the keychain: it always removes the token
 file and only warns if the keychain is unavailable.
 
 ## Path syntax
@@ -58,11 +58,11 @@ abc12/xyz34:/path             # path inside component xyz34 of project abc12
 
 GUIDs appear in OSF URLs: `https://osf.io/abc12/` → `abc12`.
 
-## .gosf/gosf.toml manifest
+## .datapin/datapin.toml manifest
 
 The manifest declares which files belong to the project and how they flow. It
-lives at `.gosf/gosf.toml`; gosf walks up from the current directory to find it.
-Create it with `gosf init <project-id>`, or let `gosf add`/`gosf pull` create it.
+lives at `.datapin/datapin.toml`; datapin walks up from the current directory to find it.
+Create it with `datapin init <project-id>`, or let `datapin add`/`datapin pull` create it.
 
 ```toml
 [project]
@@ -84,7 +84,7 @@ address a named wiki page instead of a storage path:
 local   = "docs/home.md"   # markdown file, relative to repo root
 page    = "home"           # wiki page name on OSF (flat namespace, may contain spaces)
 version = 3                # pinned wiki version; 0 = not yet pushed
-md5     = "…"              # MD5 of the pinned version's content, computed by gosf
+md5     = "…"              # MD5 of the pinned version's content, computed by datapin
 project = "xyz89"          # optional: override [project].id for this entry
 ```
 
@@ -94,11 +94,11 @@ as files.
 
 **There is no per-entry direction.** What a transfer should do is decided at the
 moment of the transfer, by comparing local content, the pinned baseline, and the
-remote (see the state table below). Manifests written by gosf ≤ 1.9 still carry a
+remote (see the state table below). Manifests written by datapin ≤ 1.9 still carry a
 `direction` key: it is ignored with a warning on load and dropped the next time
-gosf writes the file. No migration is needed.
+datapin writes the file. No migration is needed.
 
-**File states** (from `gosf status`), comparing Local / pinned Baseline / Remote:
+**File states** (from `datapin status`), comparing Local / pinned Baseline / Remote:
 
 | State | Meaning |
 |-------|---------|
@@ -111,7 +111,7 @@ gosf writes the file. No migration is needed.
 | `DIVERGED` | Both local and remote changed — unsafe to transfer automatically |
 | `NOT_PUSHED` | version = 0 and nothing on the remote to compare |
 
-`gosf status` is read-only and exits 0 only if all files are `IN_SYNC`, 1
+`datapin status` is read-only and exits 0 only if all files are `IN_SYNC`, 1
 otherwise — safe to use in CI. It content-compares unpinned (`version=0`) entries
 against the remote instead of blindly reporting "never pushed".
 
@@ -120,23 +120,23 @@ against the remote instead of blindly reporting "never pushed".
 ### Manifest commands
 
 ```bash
-gosf onboard [--project <guid>] [--remote-base <path>]  # interactive guided setup (TTY only)
-gosf init <project-id>                              # create/update .gosf/gosf.toml
-gosf add <local-path> [<project>:]<remote-path>     # track file(s) (dir = recursive)
-gosf status [--no-check-remote] [--jobs=N] [--output=json]   # show sync state of all entries
-gosf sync [--force] [--resolve=ours|theirs] [--dry-run] [--no-check-remote] [--jobs=N] [--output=json]
+datapin onboard [--project <guid>] [--remote-base <path>]  # interactive guided setup (TTY only)
+datapin init <project-id>                              # create/update .datapin/datapin.toml
+datapin add <local-path> [<project>:]<remote-path>     # track file(s) (dir = recursive)
+datapin status [--no-check-remote] [--jobs=N] [--output=json]   # show sync state of all entries
+datapin sync [--force] [--resolve=ours|theirs] [--dry-run] [--no-check-remote] [--jobs=N] [--output=json]
 ```
 
-`gosf onboard` is a resumable, interactive wizard (auth → attach a project → pick
+`datapin onboard` is a resumable, interactive wizard (auth → attach a project → pick
 git-untracked files to push via a tree checkbox UI). It writes manifest entries
-and stops; run `gosf sync` to upload. TTY only — for scripting/agents, use
+and stops; run `datapin sync` to upload. TTY only — for scripting/agents, use
 `init` + `add` + `sync` directly.
 
-`gosf add` registers a local file; `gosf pull` registers what it downloads. Both
+`datapin add` registers a local file; `datapin pull` registers what it downloads. Both
 are just ways to get an entry into the manifest — neither fixes which way the
 file will move later. If the remote path is omitted it mirrors the local path.
 
-`gosf sync` reconciles every entry that has one unambiguous answer, and reports
+`datapin sync` reconciles every entry that has one unambiguous answer, and reports
 the ones that do not:
 
 | State | Action |
@@ -154,8 +154,8 @@ the ones that do not:
 `AHEAD_OF_MANIFEST` is the one state `sync` will not guess at: the same
 difference means "publish this" for a generated output and "throw this away" for
 an edited input, and no hash comparison tells them apart. Say which you meant
-with the verb — `gosf push` publishes it, `gosf pull --force` (or
-`gosf sync --force`) discards it.
+with the verb — `datapin push` publishes it, `datapin pull --force` (or
+`datapin sync --force`) discards it.
 
 - `--force` on `sync`/`pull` discards local modifications, restoring the tracked
   version from OSF. It does **not** cover divergence.
@@ -165,25 +165,25 @@ with the verb — `gosf push` publishes it, `gosf pull --force` (or
 ### File transfer
 
 ```bash
-gosf pull <project>[:<path>] [dest] [--version=N] [--force] [--resolve=theirs] [--no-track] [--dry-run]
-gosf pull <project>:<path> <dest> --track-only      # register entries, transfer nothing
-gosf pull [--force] [--resolve=theirs] [--jobs=N]   # no args: pull tracked entries
-gosf push <src> <project>:<path> [--conflict=skip|overwrite|rename] [--no-track] [--dry-run]
-gosf push [--yes|--force] [--resolve=ours] [--no-check-remote] [--jobs=N]   # no args: push manifest entries
-gosf rm <project>:<path> [--yes] [--dry-run]
+datapin pull <project>[:<path>] [dest] [--version=N] [--force] [--resolve=theirs] [--no-track] [--dry-run]
+datapin pull <project>:<path> <dest> --track-only      # register entries, transfer nothing
+datapin pull [--force] [--resolve=theirs] [--jobs=N]   # no args: pull tracked entries
+datapin push <src> <project>:<path> [--conflict=skip|overwrite|rename] [--no-track] [--dry-run]
+datapin push [--yes|--force] [--resolve=ours] [--no-check-remote] [--jobs=N]   # no args: push manifest entries
+datapin rm <project>:<path> [--yes] [--dry-run]
 ```
 
 - Both `pull` and `push` are **idempotent**: a transfer whose content already
   matches is skipped (no redundant version, no needless download).
 - Explicit `push <src> <dest>` uses `--conflict` (default `skip`; `overwrite`
   creates a new version; `rename` → `name_1.ext`).
-- Bare `gosf push` (manifest-driven) prints a per-file plan and prompts before
+- Bare `datapin push` (manifest-driven) prints a per-file plan and prompts before
   writing remote data. `--yes` skips the prompt for safe pushes; `--force` also
   authorizes a rollback. **In `--output=json`, `--force` is required** (no prompt).
 - `pull --version=N` fetches a historical version (single-file targets only).
 - `pull --track-only` registers a remote subtree in the manifest without moving
   any bytes, so a large project can be adopted and reviewed before it is
-  downloaded. The entries land as `MISSING`; a plain `gosf sync` then fetches
+  downloaded. The entries land as `MISSING`; a plain `datapin sync` then fetches
   them. `sync` only ever visits entries in the manifest, so this is how remote
   files that nothing tracks become visible to it.
 
@@ -195,25 +195,25 @@ flat namespace that may contain spaces — and defaults to `home` where optional
 Component addressing (`abc12/xyz34:page`) works as for files.
 
 ```bash
-gosf wiki ls   <project> [--output=json]                  # list pages
-gosf wiki get  <project>[:<page>] [dest] [--version=N] [--force]
-gosf wiki push <src.md> <project>[:<page>] [--dry-run]    # create page or add a version
-gosf wiki rm   <project>:<page> [--yes] [--dry-run]
-gosf wiki mv   <project>:<page> <new-name> [--dry-run]    # rename
-gosf wiki versions <project>:<page> [--output=json]
-gosf wiki open <project>[:<page>]
-gosf wiki add  <local.md> [<project>:]<page>              # track as a [[wikis]] entry
+datapin wiki ls   <project> [--output=json]                  # list pages
+datapin wiki get  <project>[:<page>] [dest] [--version=N] [--force]
+datapin wiki push <src.md> <project>[:<page>] [--dry-run]    # create page or add a version
+datapin wiki rm   <project>:<page> [--yes] [--dry-run]
+datapin wiki mv   <project>:<page> <new-name> [--dry-run]    # rename
+datapin wiki versions <project>:<page> [--output=json]
+datapin wiki open <project>[:<page>]
+datapin wiki add  <local.md> [<project>:]<page>              # track as a [[wikis]] entry
 ```
 
 - `wiki get` prints to stdout by default; pass a `dest` to write a file
   (`--force` overwrites an existing one).
 - `wiki push` creates the page if absent, otherwise mints a new version; an
   identical re-push is skipped rather than minting a redundant version.
-- The `home` page cannot be renamed or deleted — gosf refuses client-side.
-- `wiki add` tracks a markdown file so `gosf status` / `gosf sync` reconcile the
+- The `home` page cannot be renamed or deleted — datapin refuses client-side.
+- `wiki add` tracks a markdown file so `datapin status` / `datapin sync` reconcile the
   page alongside files. `status`/`sync` items carry `"kind": "file"|"wiki"`.
 - **Content is canonicalized, not byte-exact.** OSF normalizes wiki content on
-  save (CRLF → LF, surrounding whitespace trimmed), so gosf compares a canonical
+  save (CRLF → LF, surrounding whitespace trimmed), so datapin compares a canonical
   form. A local file differing from the page only in line endings or a trailing
   newline still counts as in sync, and re-pushing it is a no-op. Do not diff raw
   bytes against what you pushed.
@@ -223,9 +223,9 @@ gosf wiki add  <local.md> [<project>:]<page>              # track as a [[wikis]]
 ### Storage management
 
 ```bash
-gosf mkdir <project>:<path>          # create a folder (parent must exist)
-gosf mv <src> <dest>                 # move/rename within or across projects
-gosf cp <src> <dest>                 # copy within or across projects
+datapin mkdir <project>:<path>          # create a folder (parent must exist)
+datapin mv <src> <dest>                 # move/rename within or across projects
+datapin cp <src> <dest>                 # copy within or across projects
 ```
 
 `mv`/`cp` accept `--conflict=keep|replace|warn`.
@@ -233,12 +233,12 @@ gosf cp <src> <dest>                 # copy within or across projects
 ### Project navigation
 
 ```bash
-gosf ls <project>[:<path>] [--output=json]     # list files/folders
-gosf info <project> [--output=json]            # project metadata
-gosf projects [--output=json]                  # list accessible projects (needs auth)
-gosf versions <project>:<path> [--output=json] # list file versions (files only)
-gosf open <project>[:<path>] [--output=json]   # open in browser (or print URL)
-gosf set <project> [--title ...] [--description ...] [--category ...] [--tags ...]
+datapin ls <project>[:<path>] [--output=json]     # list files/folders
+datapin info <project> [--output=json]            # project metadata
+datapin projects [--output=json]                  # list accessible projects (needs auth)
+datapin versions <project>:<path> [--output=json] # list file versions (files only)
+datapin open <project>[:<path>] [--output=json]   # open in browser (or print URL)
+datapin set <project> [--title ...] [--description ...] [--category ...] [--tags ...]
 ```
 
 ## Common workflows
@@ -246,9 +246,9 @@ gosf set <project> [--title ...] [--description ...] [--category ...] [--tags ..
 ### Set up a new project and pull inputs
 
 ```bash
-gosf init abc12                                  # 1. create .gosf/gosf.toml
-gosf pull abc12:/data/ ml/data/                  # 2. download + track
-gosf status                                      # 3. verify → all ✓ IN_SYNC
+datapin init abc12                                  # 1. create .datapin/datapin.toml
+datapin pull abc12:/data/ ml/data/                  # 2. download + track
+datapin status                                      # 3. verify → all ✓ IN_SYNC
 ```
 
 Pulling files that are already present locally and identical is a no-op that just
@@ -257,36 +257,36 @@ records the pin — no redundant downloads.
 ### Push locally modified outputs
 
 ```bash
-gosf add results/model.pkl abc12:/results/model.pkl   # track it (once)
-gosf status                                           # AHEAD → local has unpublished work
-gosf push --dry-run                                   # preview
-gosf push --yes                                       # publish (skip the prompt)
+datapin add results/model.pkl abc12:/results/model.pkl   # track it (once)
+datapin status                                           # AHEAD → local has unpublished work
+datapin push --dry-run                                   # preview
+datapin push --yes                                       # publish (skip the prompt)
 ```
 
 ### Resolve a divergence
 
 ```bash
-# gosf sync failed hard: notes.md changed both locally and on OSF.
-gosf sync --resolve=theirs   # take remote (discard local), or
-gosf sync --resolve=ours     # take local  (discard remote)
+# datapin sync failed hard: notes.md changed both locally and on OSF.
+datapin sync --resolve=theirs   # take remote (discard local), or
+datapin sync --resolve=ours     # take local  (discard remote)
 ```
 
 ### Keep a wiki page in the repo
 
 ```bash
-gosf wiki add docs/home.md abc12:home   # track it (pins the remote if it exists)
-gosf status                             # wiki row appears alongside files
-gosf sync                               # reconcile like any other entry
+datapin wiki add docs/home.md abc12:home   # track it (pins the remote if it exists)
+datapin status                             # wiki row appears alongside files
+datapin sync                               # reconcile like any other entry
 ```
 
-One-shot, without tracking: `gosf wiki push docs/home.md abc12:home`. To read a
-page, `gosf wiki get abc12:home` prints it to stdout.
+One-shot, without tracking: `datapin wiki push docs/home.md abc12:home`. To read a
+page, `datapin wiki get abc12:home` prints it to stdout.
 
 ### Check whether everything is in sync (CI)
 
 ```bash
-gosf status --no-check-remote   # fast: no remote API calls
-gosf status                     # full: checks BEHIND / REMOTE_NEWER / DIVERGED
+datapin status --no-check-remote   # fast: no remote API calls
+datapin status                     # full: checks BEHIND / REMOTE_NEWER / DIVERGED
 # exits 0 if all IN_SYNC, 1 otherwise
 ```
 
@@ -300,7 +300,7 @@ gosf status                     # full: checks BEHIND / REMOTE_NEWER / DIVERGED
 | `--verbose` / `-v` | Increase log verbosity (repeatable: `-v`/`-vv`/`-vvv`) |
 | `--progress-bar` / `-p` | Live progress bars for transfers (default: log lines) |
 | `--quiet` / `-q` | Errors only (conflicts with `-v`) |
-| `--version` | Print gosf version |
+| `--version` | Print datapin version |
 
 `--jobs` / `-j` is **not** global: it is accepted by the manifest-scanning
 commands (`sync`, `status`, and bare `push`/`pull`) and bounds how many entries
@@ -308,7 +308,7 @@ are checked against the remote concurrently (default 8).
 
 ## Output streams and logging
 
-`gosf` prints **results to stdout and activity to stderr**. stdout carries only
+`datapin` prints **results to stdout and activity to stderr**. stdout carries only
 the machine/result surface (`ls`/`status`/`versions`/`projects` tables,
 `info`/`set` fields, and all `--output=json` payloads); everything else — the
 remote-scan phase, per-file transfers, skips, and `add`/`init`/`cp`/`mv`/`mkdir`/
@@ -323,8 +323,8 @@ pure JSON and silences stderr logging unless `-v` is given.
 ## JSON output
 
 Every command supports `--output=json` (stdout; errors/activity on stderr). JSON
-is never colorized. In `--output=json` mode, `gosf rm` and a bytes-writing
-`gosf push` both require an explicit flag (`--yes` / `--force`) — there is no
+is never colorized. In `--output=json` mode, `datapin rm` and a bytes-writing
+`datapin push` both require an explicit flag (`--yes` / `--force`) — there is no
 prompt.
 
 ## Constraints to respect
@@ -335,8 +335,8 @@ prompt.
   one-sided discard: on `sync`/`pull` it discards local modifications and
   restores the tracked version from OSF; on `push` it authorizes a rollback
   (burying a newer remote version) and bypasses the confirmation prompt.
-- Bare `gosf push` and `gosf rm` require `--yes`/`--force` in `--output=json` mode.
-- `gosf versions` works on files, not folders.
+- Bare `datapin push` and `datapin rm` require `--yes`/`--force` in `--output=json` mode.
+- `datapin versions` works on files, not folders.
 - New files/folders upload into the parent folder resolved from OSF (osfstorage
-  addresses folders by ID); the parent must exist (`gosf mkdir` first if needed).
+  addresses folders by ID); the parent must exist (`datapin mkdir` first if needed).
 - The manifest is updated atomically after every successful push, pull, or sync.

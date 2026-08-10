@@ -21,8 +21,8 @@ var versionsCmd = &cobra.Command{
 Requires a specific file path (folders are not supported).
 
 Examples:
-  gosf versions abc12:/data/results.csv
-  gosf versions abc12:/data/results.csv --output=json`,
+  datapin versions abc12:/data/results.csv
+  datapin versions abc12:/data/results.csv --output=json`,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {

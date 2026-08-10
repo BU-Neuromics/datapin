@@ -25,9 +25,9 @@ Intermediate parent directories must already exist. Use --dry-run to
 preview without making any changes.
 
 Examples:
-  gosf mkdir abc12:/results/2026
-  gosf mkdir abc12:/data/raw/batch-01
-  gosf mkdir abc12:/scratch --dry-run`,
+  datapin mkdir abc12:/results/2026
+  datapin mkdir abc12:/data/raw/batch-01
+  datapin mkdir abc12:/scratch --dry-run`,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -41,7 +41,7 @@ Examples:
 
 		token := config.LoadToken(flagToken)
 		if token == "" {
-			return fmt.Errorf("mkdir requires authentication — run 'gosf auth login' or set OSF_TOKEN")
+			return fmt.Errorf("mkdir requires authentication — run 'datapin auth login' or set OSF_TOKEN")
 		}
 
 		folderPath := target.Path

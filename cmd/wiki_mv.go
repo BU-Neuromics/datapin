@@ -21,8 +21,8 @@ var wikiMvCmd = &cobra.Command{
 not collide with an existing page.
 
 Examples:
-  gosf wiki mv abc12:draft "Final Protocol"
-  gosf wiki mv abc12:draft final --dry-run`,
+  datapin wiki mv abc12:draft "Final Protocol"
+  datapin wiki mv abc12:draft final --dry-run`,
 	Args:         cobra.ExactArgs(2),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -40,7 +40,7 @@ Examples:
 
 		token := config.LoadToken(flagToken)
 		if token == "" {
-			return fmt.Errorf("wiki mv requires authentication — run 'gosf auth login' or set OSF_TOKEN")
+			return fmt.Errorf("wiki mv requires authentication — run 'datapin auth login' or set OSF_TOKEN")
 		}
 
 		c := client.New(token)

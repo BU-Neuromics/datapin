@@ -33,9 +33,9 @@ file is left in place; a copy is created at dest.
   warn    — error and abort
 
 Examples:
-  gosf cp abc12:/raw/counts.h5 abc12:/backup/counts.h5
-  gosf cp abc12:/templates/config.toml xyz34:/config.toml
-  gosf cp abc12:/data/file.csv abc12:/results/output.csv --conflict replace`,
+  datapin cp abc12:/raw/counts.h5 abc12:/backup/counts.h5
+  datapin cp abc12:/templates/config.toml xyz34:/config.toml
+  datapin cp abc12:/data/file.csv abc12:/results/output.csv --conflict replace`,
 	Args:         cobra.ExactArgs(2),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -56,7 +56,7 @@ Examples:
 
 		token := config.LoadToken(flagToken)
 		if token == "" {
-			return fmt.Errorf("cp requires authentication — run 'gosf auth login' or set OSF_TOKEN")
+			return fmt.Errorf("cp requires authentication — run 'datapin auth login' or set OSF_TOKEN")
 		}
 
 		srcStr := args[0]

@@ -10,7 +10,7 @@ import (
 func writeManifest(t *testing.T, content string) string {
 	t.Helper()
 	dir := t.TempDir()
-	p := filepath.Join(dir, "gosf.toml")
+	p := filepath.Join(dir, "datapin.toml")
 	if err := os.WriteFile(p, []byte(content), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +58,7 @@ project = "xyz89"
 
 func TestWikiEntrySaveRoundTrip(t *testing.T) {
 	dir := t.TempDir()
-	p := filepath.Join(dir, "gosf.toml")
+	p := filepath.Join(dir, "datapin.toml")
 	m := &Manifest{
 		Project: ProjectConfig{ID: "abc12"},
 		Wikis: []WikiEntry{

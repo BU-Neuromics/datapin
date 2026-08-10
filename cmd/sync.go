@@ -39,8 +39,8 @@ func scanConcurrency(jobs int) int {
 
 var syncCmd = &cobra.Command{
 	Use:   "sync",
-	Short: "Sync local files with OSF according to .gosf/gosf.toml",
-	Long: `Reconcile the files and wiki pages declared in .gosf/gosf.toml with OSF.
+	Short: "Sync local files with OSF according to .datapin/datapin.toml",
+	Long: `Reconcile the files and wiki pages declared in .datapin/datapin.toml with OSF.
 
 Each entry is classified by comparing local content, the pinned baseline, and
 the remote, and the one correct action for that state is taken:
@@ -56,11 +56,11 @@ the remote, and the one correct action for that state is taken:
   DIVERGED            fail before any transfer; pass --resolve to pick a side
 
 Examples:
-  gosf sync                         # reconcile everything with a clear answer
-  gosf sync --force                 # also discard local edits, restoring from OSF
-  gosf sync --resolve=theirs        # resolve diverged entries by taking the remote
-  gosf sync --dry-run               # show what would happen
-  gosf sync --no-check-remote       # faster, but skips BEHIND/REMOTE_NEWER detection`,
+  datapin sync                         # reconcile everything with a clear answer
+  datapin sync --force                 # also discard local edits, restoring from OSF
+  datapin sync --resolve=theirs        # resolve diverged entries by taking the remote
+  datapin sync --dry-run               # show what would happen
+  datapin sync --no-check-remote       # faster, but skips BEHIND/REMOTE_NEWER detection`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := validateResolve(syncResolve); err != nil {
@@ -68,7 +68,7 @@ Examples:
 		}
 		manifestPath, repoRoot, err := manifest.FindManifest()
 		if manifest.IsNotFound(err) {
-			return fmt.Errorf("no .gosf/gosf.toml found — run 'gosf init <project-id>' to start tracking this repo, then 'gosf add' / 'gosf pull' to register files")
+			return fmt.Errorf("no .datapin/datapin.toml found — run 'datapin init <project-id>' to start tracking this repo, then 'datapin add' / 'datapin pull' to register files")
 		}
 		if err != nil {
 			return err
@@ -80,12 +80,12 @@ Examples:
 		}
 
 		if m.Project.ID == "" {
-			return fmt.Errorf("no project configured — run: gosf init <project-id>")
+			return fmt.Errorf("no project configured — run: datapin init <project-id>")
 		}
 
 		token := config.LoadToken(flagToken)
 		if token == "" {
-			return fmt.Errorf("sync requires authentication — run 'gosf auth login' or set OSF_TOKEN")
+			return fmt.Errorf("sync requires authentication — run 'datapin auth login' or set OSF_TOKEN")
 		}
 
 		osfClient := client.New(token)
@@ -192,7 +192,7 @@ Examples:
 		// Entries that were reported rather than reconciled leave the working
 		// tree out of sync, so the run is not a success — but it is not a hard
 		// error either: nothing was left half-applied, and both remedies are
-		// recoverable. Signal it the way `gosf status` does.
+		// recoverable. Signal it the way `datapin status` does.
 		if reported > 0 {
 			return &exitCodeError{code: 1}
 		}
@@ -249,7 +249,7 @@ func executeEntry(ctx context.Context, p entryPlan, act syncAction, d transferDe
 		// remote. Publishing it and discarding it are both defensible, and no
 		// hash comparison can tell them apart — so say so and touch nothing.
 		log.Warnf("%s: locally modified (differs from pinned v%d and from the remote) — "+
-			"'gosf push' to publish it, 'gosf pull --force' to discard it", entry.Local, entry.Version)
+			"'datapin push' to publish it, 'datapin pull --force' to discard it", entry.Local, entry.Version)
 		return "skipped_modified", false, nil
 
 	case actionBlocked:

@@ -22,8 +22,8 @@ Wiki pages are addressed as <project>:<page-name>. Page names live in a flat
 namespace (they are not paths) and may contain spaces — quote them in the shell.
 Where a page name is optional it defaults to "home", the page OSF shows first.
 
-Track pages in .gosf/gosf.toml with 'gosf wiki add' to sync them like files
-(gosf status / gosf sync).`,
+Track pages in .datapin/datapin.toml with 'datapin wiki add' to sync them like files
+(datapin status / datapin sync).`,
 }
 
 // parseWikiTarget parses a <project>[:<page>] argument. The node part accepts
@@ -118,7 +118,7 @@ func resolveWikiPage(ctx context.Context, c *client.OSFClient, nodeID, page stri
 	}
 	w, ok := findWikiPage(wikis, page)
 	if !ok {
-		return nil, fmt.Errorf("wiki page %q not found on project %s (see 'gosf wiki ls %s')", page, nodeID, nodeID)
+		return nil, fmt.Errorf("wiki page %q not found on project %s (see 'datapin wiki ls %s')", page, nodeID, nodeID)
 	}
 	return w, nil
 }

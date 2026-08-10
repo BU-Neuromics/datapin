@@ -35,10 +35,10 @@ var pushCmd = &cobra.Command{
 
 With no arguments, publishes every tracked file that holds local work the remote
 does not have: files modified since they were last synced, and files never
-pushed. Requires .gosf/gosf.toml with [project].id set (run 'gosf init').
+pushed. Requires .datapin/datapin.toml with [project].id set (run 'datapin init').
 
 With arguments, uploads the specified local file or directory and records it
-in .gosf/gosf.toml (unless --no-track is set).
+in .datapin/datapin.toml (unless --no-track is set).
 
 Conflict behaviour (--conflict):
   skip      (default) Skip files that already exist at the destination.
@@ -46,10 +46,10 @@ Conflict behaviour (--conflict):
   rename              Append _1, _2, … to find a free name.
 
 Examples:
-  gosf push                               # publish local changes to tracked files
-  gosf push results.csv abc12:/data/results.csv
-  gosf push ./results/  abc12:/data/
-  gosf push data.csv    abc12:/data/data.csv --conflict=overwrite`,
+  datapin push                               # publish local changes to tracked files
+  datapin push results.csv abc12:/data/results.csv
+  datapin push ./results/  abc12:/data/
+  datapin push data.csv    abc12:/data/data.csv --conflict=overwrite`,
 	Args:         cobra.RangeArgs(0, 2),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -60,7 +60,7 @@ Examples:
 			return runBarePush(cmd)
 		}
 		if len(args) == 1 {
-			return fmt.Errorf("usage: gosf push <src> <project>:<path>")
+			return fmt.Errorf("usage: datapin push <src> <project>:<path>")
 		}
 
 		src := args[0]
@@ -83,7 +83,7 @@ Examples:
 
 		token := config.LoadToken(flagToken)
 		if token == "" {
-			return fmt.Errorf("push requires authentication — run 'gosf auth login' or set OSF_TOKEN")
+			return fmt.Errorf("push requires authentication — run 'datapin auth login' or set OSF_TOKEN")
 		}
 
 		osfClient := client.New(token)
@@ -93,7 +93,7 @@ Examples:
 			return fmt.Errorf("source: %w", err)
 		}
 
-		// Load existing .gosf/gosf.toml; if absent and tracking enabled, prepare to create one.
+		// Load existing .datapin/datapin.toml; if absent and tracking enabled, prepare to create one.
 		var mf *manifest.Manifest
 		var mfPath string
 		mfPathFound, _, findErr := manifest.FindManifest()
@@ -103,7 +103,7 @@ Examples:
 				mfPath = mfPathFound
 			}
 		} else if manifest.IsNotFound(findErr) && !pushNoTrack {
-			mfPath = filepath.Join(".gosf", "gosf.toml")
+			mfPath = filepath.Join(".datapin", "datapin.toml")
 			mf = &manifest.Manifest{Project: manifest.ProjectConfig{ID: target.NodeID}}
 		}
 
@@ -133,7 +133,7 @@ Examples:
 
 		if s.manifestDirty && !s.dryRun {
 			if err := manifest.Save(s.manifest, s.manifestPath); err != nil {
-				return fmt.Errorf("updating .gosf/gosf.toml: %w", err)
+				return fmt.Errorf("updating .datapin/datapin.toml: %w", err)
 			}
 		}
 
@@ -151,7 +151,7 @@ Examples:
 func runBarePush(cmd *cobra.Command) error {
 	manifestPath, repoRoot, err := manifest.FindManifest()
 	if manifest.IsNotFound(err) {
-		return fmt.Errorf("no .gosf/gosf.toml found — run: gosf init <project-id>")
+		return fmt.Errorf("no .datapin/datapin.toml found — run: datapin init <project-id>")
 	}
 	if err != nil {
 		return err
@@ -162,12 +162,12 @@ func runBarePush(cmd *cobra.Command) error {
 		return err
 	}
 	if m.Project.ID == "" {
-		return fmt.Errorf("no project configured — run: gosf init <project-id>")
+		return fmt.Errorf("no project configured — run: datapin init <project-id>")
 	}
 
 	token := config.LoadToken(flagToken)
 	if token == "" {
-		return fmt.Errorf("push requires authentication — run 'gosf auth login' or set OSF_TOKEN")
+		return fmt.Errorf("push requires authentication — run 'datapin auth login' or set OSF_TOKEN")
 	}
 
 	osfClient := client.New(token)
@@ -206,7 +206,7 @@ func runBarePush(cmd *cobra.Command) error {
 
 	// Confirmation gate. A push that writes remote bytes must be confirmed
 	// unless --yes/--force (or --quiet). In JSON mode --force is mandatory so a
-	// non-interactive run can never hang on a prompt (same rule as `gosf rm`).
+	// non-interactive run can never hang on a prompt (same rule as `datapin rm`).
 	states := make([]manifest.FileState, len(plans))
 	for i, p := range plans {
 		states[i] = p.state
@@ -327,7 +327,7 @@ func (s *pushSession) file(srcPath, nodeID, destPath string) error {
 	if s.track && s.manifest != nil && plan.action != "skip" {
 		if idx := findEntryByRemote(s.manifest, nodeID, destFull); idx >= 0 {
 			if s.manifest.Files[idx].Local != srcPath {
-				return fmt.Errorf("push refused: %s:%s is already tracked to %q — edit .gosf/gosf.toml to change",
+				return fmt.Errorf("push refused: %s:%s is already tracked to %q — edit .datapin/datapin.toml to change",
 					nodeID, destFull, s.manifest.Files[idx].Local)
 			}
 		}
@@ -546,7 +546,7 @@ func findFreeName(filename string, siblings []client.FileItem) string {
 func init() {
 	pushCmd.Flags().BoolVar(&pushDryRun, "dry-run", false, "Show what would be uploaded without uploading")
 	pushCmd.Flags().StringVar(&pushConflict, "conflict", "skip", "Conflict resolution: skip, overwrite, or rename")
-	pushCmd.Flags().BoolVar(&pushNoTrack, "no-track", false, "Upload without recording in .gosf/gosf.toml")
+	pushCmd.Flags().BoolVar(&pushNoTrack, "no-track", false, "Upload without recording in .datapin/datapin.toml")
 	pushCmd.Flags().BoolVar(&pushNoCheckRemote, "no-check-remote", false, "Skip remote version lookups for bare push")
 	pushCmd.Flags().IntVarP(&pushJobs, "jobs", "j", defaultScanJobs, "Number of files to scan against the remote concurrently")
 	pushCmd.Flags().BoolVar(&pushForce, "force", false, "Bypass the confirmation prompt and authorize remote-newer rollbacks")

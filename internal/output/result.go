@@ -4,12 +4,12 @@ package output
 // --output=json is used. Keeping them in one place makes the JSON contract
 // that scripting clients depend on explicit and testable.
 
-// OpenResult is emitted by `gosf open --output=json`.
+// OpenResult is emitted by `datapin open --output=json`.
 type OpenResult struct {
 	URL string `json:"url"`
 }
 
-// RemoveResult is emitted by `gosf rm --output=json`.
+// RemoveResult is emitted by `datapin rm --output=json`.
 type RemoveResult struct {
 	Node   string `json:"node"`
 	Path   string `json:"path"`
@@ -24,7 +24,7 @@ type TransferItem struct {
 	Action string `json:"action,omitempty"` // push: upload|overwrite|rename|skip
 }
 
-// PullResult is emitted by `gosf pull --output=json`.
+// PullResult is emitted by `datapin pull --output=json`.
 type PullResult struct {
 	Downloaded []TransferItem `json:"downloaded"`
 	DryRun     bool           `json:"dry_run"`
@@ -41,7 +41,7 @@ func (r *PullResult) Add(path string, size int64) {
 	r.Downloaded = append(r.Downloaded, TransferItem{Path: path, Size: size})
 }
 
-// PushResult is emitted by `gosf push --output=json`.
+// PushResult is emitted by `datapin push --output=json`.
 type PushResult struct {
 	Uploaded []TransferItem `json:"uploaded"`
 	DryRun   bool           `json:"dry_run"`
@@ -58,7 +58,7 @@ func (r *PushResult) Add(path, action string) {
 	r.Uploaded = append(r.Uploaded, TransferItem{Path: path, Action: action})
 }
 
-// AddEntry describes one file staged by `gosf add`.
+// AddEntry describes one file staged by `datapin add`.
 type AddEntry struct {
 	Local   string `json:"local"`
 	Remote  string `json:"remote"`
@@ -67,13 +67,13 @@ type AddEntry struct {
 	MD5     string `json:"md5"`
 }
 
-// AddResult is emitted by `gosf add --output=json`.
+// AddResult is emitted by `datapin add --output=json`.
 type AddResult struct {
 	Entries         []AddEntry `json:"entries"`
 	ManifestCreated bool       `json:"manifest_created"`
 }
 
-// StatusItem describes one manifest entry's state, emitted by `gosf status --output=json`.
+// StatusItem describes one manifest entry's state, emitted by `datapin status --output=json`.
 type StatusItem struct {
 	Path                string `json:"path"`
 	Kind                string `json:"kind"` // "file" or "wiki"
@@ -82,7 +82,7 @@ type StatusItem struct {
 	RemoteLatestVersion int    `json:"remote_latest_version,omitempty"`
 }
 
-// SyncItem describes the action taken for one manifest entry, emitted by `gosf sync --output=json`.
+// SyncItem describes the action taken for one manifest entry, emitted by `datapin sync --output=json`.
 type SyncItem struct {
 	Path                string `json:"path"`
 	Kind                string `json:"kind"` // "file" or "wiki"
@@ -100,7 +100,7 @@ type VersionItem struct {
 	Contributor string `json:"contributor"`
 }
 
-// VersionsResult is emitted by `gosf versions --output=json`.
+// VersionsResult is emitted by `datapin versions --output=json`.
 type VersionsResult struct {
 	Versions []VersionItem `json:"versions"`
 }
@@ -111,27 +111,27 @@ func NewVersionsResult() *VersionsResult {
 	return &VersionsResult{Versions: []VersionItem{}}
 }
 
-// MvResult is emitted by `gosf mv --output=json`.
+// MvResult is emitted by `datapin mv --output=json`.
 type MvResult struct {
 	Src    string `json:"src"`
 	Dest   string `json:"dest"`
 	DryRun bool   `json:"dry_run"`
 }
 
-// CpResult is emitted by `gosf cp --output=json`.
+// CpResult is emitted by `datapin cp --output=json`.
 type CpResult struct {
 	Src    string `json:"src"`
 	Dest   string `json:"dest"`
 	DryRun bool   `json:"dry_run"`
 }
 
-// InitResult is emitted by `gosf init --output=json`.
+// InitResult is emitted by `datapin init --output=json`.
 type InitResult struct {
 	Project string `json:"project"`
 	Created bool   `json:"created"`
 }
 
-// WikiListItem describes one wiki page, emitted by `gosf wiki ls --output=json`.
+// WikiListItem describes one wiki page, emitted by `datapin wiki ls --output=json`.
 type WikiListItem struct {
 	ID           string `json:"id"`
 	Name         string `json:"name"`
@@ -140,7 +140,7 @@ type WikiListItem struct {
 	DateModified string `json:"date_modified"`
 }
 
-// WikiGetResult is emitted by `gosf wiki get --output=json`.
+// WikiGetResult is emitted by `datapin wiki get --output=json`.
 type WikiGetResult struct {
 	Project string `json:"project"`
 	Page    string `json:"page"`
@@ -149,7 +149,7 @@ type WikiGetResult struct {
 	Content string `json:"content"`
 }
 
-// WikiPushResult is emitted by `gosf wiki push --output=json`.
+// WikiPushResult is emitted by `datapin wiki push --output=json`.
 type WikiPushResult struct {
 	Project string `json:"project"`
 	Page    string `json:"page"`
@@ -158,14 +158,14 @@ type WikiPushResult struct {
 	DryRun  bool   `json:"dry_run"`
 }
 
-// WikiRemoveResult is emitted by `gosf wiki rm --output=json`.
+// WikiRemoveResult is emitted by `datapin wiki rm --output=json`.
 type WikiRemoveResult struct {
 	Node   string `json:"node"`
 	Page   string `json:"page"`
 	DryRun bool   `json:"dry_run"`
 }
 
-// WikiMvResult is emitted by `gosf wiki mv --output=json`.
+// WikiMvResult is emitted by `datapin wiki mv --output=json`.
 type WikiMvResult struct {
 	Node   string `json:"node"`
 	From   string `json:"from"`
@@ -173,7 +173,7 @@ type WikiMvResult struct {
 	DryRun bool   `json:"dry_run"`
 }
 
-// WikiAddEntry describes one wiki page staged by `gosf wiki add`.
+// WikiAddEntry describes one wiki page staged by `datapin wiki add`.
 type WikiAddEntry struct {
 	Local   string `json:"local"`
 	Page    string `json:"page"`
@@ -182,13 +182,13 @@ type WikiAddEntry struct {
 	MD5     string `json:"md5"`
 }
 
-// WikiAddResult is emitted by `gosf wiki add --output=json`.
+// WikiAddResult is emitted by `datapin wiki add --output=json`.
 type WikiAddResult struct {
 	Entries         []WikiAddEntry `json:"entries"`
 	ManifestCreated bool           `json:"manifest_created"`
 }
 
-// MkdirResult is emitted by `gosf mkdir --output=json`.
+// MkdirResult is emitted by `datapin mkdir --output=json`.
 type MkdirResult struct {
 	Path    string `json:"path"`
 	Created bool   `json:"created"`

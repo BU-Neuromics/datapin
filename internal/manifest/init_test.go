@@ -17,7 +17,7 @@ func TestInit_CreatesManifest(t *testing.T) {
 	if !created {
 		t.Error("created should be true for new manifest")
 	}
-	want := filepath.Join(dir, ".gosf", "gosf.toml")
+	want := filepath.Join(dir, ".datapin", "datapin.toml")
 	if path != want {
 		t.Errorf("path = %q, want %q", path, want)
 	}
@@ -33,21 +33,21 @@ func TestInit_CreatesManifest(t *testing.T) {
 	}
 }
 
-func TestInit_CreatesGosfDir(t *testing.T) {
+func TestInit_CreatesDatapinDir(t *testing.T) {
 	dir := t.TempDir()
 	_, _, err := manifest.Init(dir, "abc12")
 	if err != nil {
 		t.Fatalf("Init: %v", err)
 	}
-	if _, statErr := os.Stat(filepath.Join(dir, ".gosf")); os.IsNotExist(statErr) {
-		t.Error("Init should create .gosf/ directory")
+	if _, statErr := os.Stat(filepath.Join(dir, ".datapin")); os.IsNotExist(statErr) {
+		t.Error("Init should create .datapin/ directory")
 	}
 }
 
 func TestInit_UpdatesExistingManifest(t *testing.T) {
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".gosf"), 0755)
-	writeFile(t, filepath.Join(dir, ".gosf"), "gosf.toml", validTOML)
+	os.MkdirAll(filepath.Join(dir, ".datapin"), 0755)
+	writeFile(t, filepath.Join(dir, ".datapin"), "datapin.toml", validTOML)
 
 	path, created, err := manifest.Init(dir, "xyz99")
 	if err != nil {
@@ -80,8 +80,8 @@ version   = 0
 md5       = ""
 project   = "xyz89"
 `
-	os.MkdirAll(filepath.Join(dir, ".gosf"), 0755)
-	writeFile(t, filepath.Join(dir, ".gosf"), "gosf.toml", toml)
+	os.MkdirAll(filepath.Join(dir, ".datapin"), 0755)
+	writeFile(t, filepath.Join(dir, ".datapin"), "datapin.toml", toml)
 
 	_, _, err := manifest.Init(dir, "abc12")
 	if err != nil {
@@ -89,13 +89,13 @@ project   = "xyz89"
 	}
 }
 
-func TestInit_ReturnedPathIsInsideGosfDir(t *testing.T) {
+func TestInit_ReturnedPathIsInsideDatapinDir(t *testing.T) {
 	dir := t.TempDir()
 	path, _, err := manifest.Init(dir, "abc12")
 	if err != nil {
 		t.Fatalf("Init: %v", err)
 	}
-	want := filepath.Join(dir, ".gosf", "gosf.toml")
+	want := filepath.Join(dir, ".datapin", "datapin.toml")
 	if path != want {
 		t.Errorf("path = %q, want %q", path, want)
 	}

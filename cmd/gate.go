@@ -62,13 +62,13 @@ func (a syncAction) String() string {
 	}
 }
 
-// syncDecision is the whole of `gosf sync`'s policy: reconcile everything that
+// syncDecision is the whole of `datapin sync`'s policy: reconcile everything that
 // has an unambiguous answer, report what does not.
 //
 //	IN_SYNC             nothing
 //	PIN_ONLY            record version + md5, no transfer
 //	MISSING             download (writing a file that does not exist destroys
-//	                    nothing — it is the safest transfer gosf can perform,
+//	                    nothing — it is the safest transfer datapin can perform,
 //	                    and needs no --force)
 //	BEHIND              fast-forward
 //	REMOTE_NEWER        fast-forward
@@ -100,7 +100,7 @@ func syncDecision(state manifest.FileState, localExists, force bool, resolve str
 	return actionNone
 }
 
-// pushDecision is bare `gosf push`: publish local work. It selects the states
+// pushDecision is bare `datapin push`: publish local work. It selects the states
 // where local holds content the remote does not, plus a deliberate rollback
 // under --force. Where local content is already on the remote (REMOTE_NEWER,
 // BEHIND) a push would only bury a newer version while adding nothing, so it is
@@ -130,7 +130,7 @@ func pushDecision(state manifest.FileState, localExists, force bool, resolve str
 	return actionNone
 }
 
-// pullDecision is bare `gosf pull`: fetch what the remote has and local does
+// pullDecision is bare `datapin pull`: fetch what the remote has and local does
 // not. It never uploads, so --resolve=ours is not a resolution it can apply.
 func pullDecision(state manifest.FileState, force bool, resolve string) syncAction {
 	switch state {
@@ -268,9 +268,9 @@ func divergenceError(entry manifest.Entry, proj, localMD5 string, remoteVersions
 			"  remote:   v%d  md5 %s   (changed)\n"+
 			"Both sides have unreconciled changes; refusing to overwrite either automatically.\n"+
 			"Resolve explicitly:\n"+
-			"  gosf sync --resolve=theirs   # take remote (discards local)\n"+
-			"  gosf sync --resolve=ours     # take local  (discards remote v%d)\n"+
-			"or inspect the remote first:  gosf pull %s:%s scratch-copy",
+			"  datapin sync --resolve=theirs   # take remote (discards local)\n"+
+			"  datapin sync --resolve=ours     # take local  (discards remote v%d)\n"+
+			"or inspect the remote first:  datapin pull %s:%s scratch-copy",
 		entry.Local,
 		entry.Version, shortMD5(entry.MD5),
 		shortMD5(localMD5),

@@ -34,7 +34,7 @@ func newWikiScanFixture(t *testing.T) (*fakeosf.Server, *client.OSFClient) {
 	t.Helper()
 	srv := fakeosf.New()
 	t.Cleanup(srv.Close)
-	t.Setenv("GOSF_API_BASE", srv.URL()+"/v2")
+	t.Setenv("DATAPIN_API_BASE", srv.URL()+"/v2")
 	return srv, client.New("")
 }
 

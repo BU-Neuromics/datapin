@@ -3,8 +3,8 @@
   "groupings": [
     {
       "title": "OSF",
-      "description": "Skills for working with the Open Science Framework (OSF) via gosf.",
-      "skills": ["gosf"]
+      "description": "Skills for working with the Open Science Framework (OSF) via datapin.",
+      "skills": ["datapin"]
     }
   ]
 }

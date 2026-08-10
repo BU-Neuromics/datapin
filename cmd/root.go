@@ -32,9 +32,9 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:          "gosf",
-	Short:        "CLI for the Open Science Framework (osf.io)",
-	Long:         "gosf — push, pull, and manage files on the Open Science Framework.",
+	Use:          "datapin",
+	Short:        "Pin, sync, and publish research data",
+	Long:         "datapin — pin, sync, and publish research data. Currently syncs against the Open Science Framework (osf.io); archival publication backends are on the way.",
 	SilenceUsage: true,
 	Version:      version,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -87,7 +87,7 @@ func progressBarEnabled() bool {
 }
 
 // exitCodeError is an error that carries a specific exit code without printing
-// an additional message. Returned by commands like gosf status.
+// an additional message. Returned by commands like datapin status.
 type exitCodeError struct {
 	code int
 	msg  string
@@ -114,7 +114,7 @@ func Execute() {
 	stop() // release signal handling before the (best-effort) update check
 
 	// Cached, best-effort "new release available" notice. Skipped after a Ctrl-C
-	// and gated internally on TTY / --quiet / --output=json / GOSF_NO_UPDATE_CHECK.
+	// and gated internally on TTY / --quiet / --output=json / DATAPIN_NO_UPDATE_CHECK.
 	if !canceled {
 		update.MaybeNotify(version, flagOutput == "json", flagQuiet)
 	}

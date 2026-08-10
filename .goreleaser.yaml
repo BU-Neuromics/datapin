@@ -5,9 +5,9 @@ before:
     - go mod tidy
 
 builds:
-  - id: gosf
+  - id: datapin
     main: .
-    binary: gosf
+    binary: datapin
     env:
       - CGO_ENABLED=0
     goos:
@@ -18,10 +18,10 @@ builds:
       - amd64
       - arm64
     ldflags:
-      - -s -w -X github.com/BU-Neuromics/gosf/cmd.version={{.Version}}
+      - -s -w -X github.com/BU-Neuromics/datapin/cmd.version={{.Version}}
 
 archives:
-  - id: gosf
+  - id: datapin
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     formats: [tar.gz]
     format_overrides:
@@ -34,7 +34,7 @@ checksum:
 release:
   github:
     owner: BU-Neuromics
-    name: gosf
+    name: datapin
 
 changelog:
   disable: true # release notes are sourced from CHANGELOG.md by the workflow

@@ -35,8 +35,8 @@ func wikiDivergenceError(entry manifest.WikiEntry, proj, localMD5 string, remote
 			"  remote:   v%d  md5 %s   (changed)\n"+
 			"Both sides have unreconciled changes; refusing to overwrite either automatically.\n"+
 			"Resolve explicitly:\n"+
-			"  gosf sync --resolve=theirs   # take remote (discards local)\n"+
-			"  gosf sync --resolve=ours     # take local  (discards remote v%d)",
+			"  datapin sync --resolve=theirs   # take remote (discards local)\n"+
+			"  datapin sync --resolve=ours     # take local  (discards remote v%d)",
 		entry.Local, entry.Page,
 		entry.Version, shortMD5(entry.MD5),
 		shortMD5(localMD5),
@@ -83,7 +83,7 @@ func executeWikiEntry(
 
 	case actionReport:
 		log.Warnf("wiki %s: locally modified (differs from pinned v%d and from the remote) — "+
-			"'gosf push' to publish it, 'gosf sync --force' to discard it", entry.Local, entry.Version)
+			"'datapin push' to publish it, 'datapin sync --force' to discard it", entry.Local, entry.Version)
 		return "skipped_modified", false, nil
 
 	case actionBlocked:
@@ -236,7 +236,7 @@ func downloadWikiVersion(
 // or interrupted write never leaves a partial/corrupt file in place.
 func writeFileAtomic(path string, content []byte) error {
 	dir := filepath.Dir(path)
-	tmp, err := os.CreateTemp(dir, ".gosf-wiki.*.tmp")
+	tmp, err := os.CreateTemp(dir, ".datapin-wiki.*.tmp")
 	if err != nil {
 		return err
 	}

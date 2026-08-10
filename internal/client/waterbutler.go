@@ -223,14 +223,14 @@ func (c *WaterbutlerClient) Delete(ctx context.Context, deleteURL string) error 
 // RootUploadURL returns the Waterbutler URL for the storage root of a node —
 // the base you PUT to (with a name/kind query) to add a new item at the root.
 //
-// Set GOSF_FILES_BASE to override the Waterbutler base URL (useful in tests).
+// Set DATAPIN_FILES_BASE to override the Waterbutler base URL (useful in tests).
 //
 // NOTE: osfstorage addresses folders by opaque object ID, not by name, so there
 // is deliberately no "build a path from folder names" helper — to upload into a
 // subfolder, take that folder's links.upload (an ID-based URL from the metadata
 // API) and pass it to AppendUploadName.
 func RootUploadURL(nodeID string) string {
-	filesBase := os.Getenv("GOSF_FILES_BASE")
+	filesBase := os.Getenv("DATAPIN_FILES_BASE")
 	if filesBase == "" {
 		filesBase = wbBase
 	}

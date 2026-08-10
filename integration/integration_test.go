@@ -39,14 +39,14 @@ func buildBinary() (string, error) {
 		return "", err
 	}
 
-	tmp, err := os.MkdirTemp("", "gosf-integ-*")
+	tmp, err := os.MkdirTemp("", "datapin-integ-*")
 	if err != nil {
 		return "", err
 	}
 
-	bin := filepath.Join(tmp, "gosf")
+	bin := filepath.Join(tmp, "datapin")
 	buildArgs := []string{"build", "-o", bin, "."}
-	if os.Getenv("GOSF_COVERDIR") != "" {
+	if os.Getenv("DATAPIN_COVERDIR") != "" {
 		// Instrument the binary so subprocess runs emit coverage into GOCOVERDIR.
 		buildArgs = []string{"build", "-cover", "-o", bin, "."}
 	}
@@ -58,10 +58,10 @@ func buildBinary() (string, error) {
 	return bin, nil
 }
 
-// coverEnv returns a GOCOVERDIR entry for the subprocess when GOSF_COVERDIR is
+// coverEnv returns a GOCOVERDIR entry for the subprocess when DATAPIN_COVERDIR is
 // set, so an instrumented binary writes its coverage there; empty otherwise.
 func coverEnv() []string {
-	if dir := os.Getenv("GOSF_COVERDIR"); dir != "" {
+	if dir := os.Getenv("DATAPIN_COVERDIR"); dir != "" {
 		return []string{"GOCOVERDIR=" + dir}
 	}
 	return nil
@@ -81,7 +81,7 @@ func newTestEnv(t *testing.T) *testEnv {
 	return &testEnv{t: t, srv: srv, dir: t.TempDir()}
 }
 
-// run executes gosf with args in the test directory and returns stdout, stderr, exit code.
+// run executes datapin with args in the test directory and returns stdout, stderr, exit code.
 func (e *testEnv) run(args ...string) (stdout, stderr string, code int) {
 	e.t.Helper()
 	cmd := exec.Command(binaryPath, args...)
@@ -89,9 +89,9 @@ func (e *testEnv) run(args ...string) (stdout, stderr string, code int) {
 	cmd.Env = append(os.Environ(),
 		// The OSF client appends "/nodes/...", "/files/..." etc. to the base,
 		// so we must include the /v2 prefix that the real URL carries.
-		"GOSF_API_BASE="+e.srv.URL()+"/v2",
+		"DATAPIN_API_BASE="+e.srv.URL()+"/v2",
 		// The Waterbutler client uses the full path, so no suffix needed.
-		"GOSF_FILES_BASE="+e.srv.URL(),
+		"DATAPIN_FILES_BASE="+e.srv.URL(),
 		"OSF_TOKEN=test-token",
 		// Isolate from the developer's real keychain and config.
 		"HOME="+e.dir,
@@ -111,7 +111,7 @@ func (e *testEnv) run(args ...string) (stdout, stderr string, code int) {
 	return outBuf.String(), errBuf.String(), code
 }
 
-// runClean runs gosf like run() but with NO forced OSF_TOKEN (it is cleared) and
+// runClean runs datapin like run() but with NO forced OSF_TOKEN (it is cleared) and
 // optional stdin, so auth tests fully control the token source. Storage stays
 // isolated in the test's temp HOME/XDG dir.
 func (e *testEnv) runClean(stdin string, args ...string) (stdout, stderr string, code int) {
@@ -119,8 +119,8 @@ func (e *testEnv) runClean(stdin string, args ...string) (stdout, stderr string,
 	cmd := exec.Command(binaryPath, args...)
 	cmd.Dir = e.dir
 	cmd.Env = append(os.Environ(),
-		"GOSF_API_BASE="+e.srv.URL()+"/v2",
-		"GOSF_FILES_BASE="+e.srv.URL(),
+		"DATAPIN_API_BASE="+e.srv.URL()+"/v2",
+		"DATAPIN_FILES_BASE="+e.srv.URL(),
 		"HOME="+e.dir,
 		"XDG_CONFIG_HOME="+filepath.Join(e.dir, ".config"),
 		"OSF_TOKEN=", // clear any inherited token; auth tests set their own source
@@ -231,7 +231,7 @@ func TestPull_AutoTracksFile(t *testing.T) {
 	env := newTestEnv(t)
 	env.srv.AddProject("abc12", "Test Project")
 	env.srv.AddFile("abc12", "/data/counts.h5", []byte("h5 content"))
-	env.writeFile(".gosf/gosf.toml", "[project]\nid = \"abc12\"\n")
+	env.writeFile(".datapin/datapin.toml", "[project]\nid = \"abc12\"\n")
 
 	_, stderr, code := env.run("pull", "abc12:/data/counts.h5", "--quiet")
 	if code != 0 {
@@ -240,7 +240,7 @@ func TestPull_AutoTracksFile(t *testing.T) {
 	if !env.fileExists("data/counts.h5") {
 		t.Fatal("file not downloaded")
 	}
-	toml := env.readFile(".gosf/gosf.toml")
+	toml := env.readFile(".datapin/datapin.toml")
 	if !strings.Contains(toml, "/data/counts.h5") {
 		t.Errorf("expected manifest entry for /data/counts.h5:\n%s", toml)
 	}
@@ -256,7 +256,7 @@ func TestPull_NoTrack(t *testing.T) {
 	env := newTestEnv(t)
 	env.srv.AddProject("abc12", "Test Project")
 	env.srv.AddFile("abc12", "/data/counts.h5", []byte("h5 content"))
-	env.writeFile(".gosf/gosf.toml", "[project]\nid = \"abc12\"\n")
+	env.writeFile(".datapin/datapin.toml", "[project]\nid = \"abc12\"\n")
 
 	_, stderr, code := env.run("pull", "abc12:/data/counts.h5", "--no-track", "--quiet")
 	if code != 0 {
@@ -265,7 +265,7 @@ func TestPull_NoTrack(t *testing.T) {
 	if !env.fileExists("data/counts.h5") {
 		t.Fatal("file not downloaded")
 	}
-	toml := env.readFile(".gosf/gosf.toml")
+	toml := env.readFile(".datapin/datapin.toml")
 	if strings.Contains(toml, "counts.h5") {
 		t.Errorf("--no-track: manifest should not contain counts.h5:\n%s", toml)
 	}
@@ -284,7 +284,7 @@ remote = "/data/counts.h5"
 version = 0
 md5 = ""
 `
-	env.writeFile(".gosf/gosf.toml", manifestBody)
+	env.writeFile(".datapin/datapin.toml", manifestBody)
 
 	// Pulling a tracked remote path to an explicit alternate destination is a
 	// plain download: it must succeed, land the bytes at the requested path,
@@ -303,7 +303,7 @@ md5 = ""
 		t.Errorf("stderr should note the download was not tracked: %s", stderr)
 	}
 	// The manifest must be unchanged: no new entry for the scratch path.
-	toml := env.readFile(".gosf/gosf.toml")
+	toml := env.readFile(".datapin/datapin.toml")
 	if strings.Contains(toml, "scratch/copy.h5") {
 		t.Errorf("manifest should not have been re-tracked; got:\n%s", toml)
 	}
@@ -316,7 +316,7 @@ func TestPull_BareFollowsManifest(t *testing.T) {
 	env := newTestEnv(t)
 	env.srv.AddProject("abc12", "Test Project")
 	f := env.srv.AddFile("abc12", "/data/counts.h5", []byte("counts data"))
-	env.writeFile(".gosf/gosf.toml", fmt.Sprintf(`[project]
+	env.writeFile(".datapin/datapin.toml", fmt.Sprintf(`[project]
 id = "abc12"
 
 [[files]]
@@ -337,15 +337,15 @@ md5 = "%s"
 
 func TestPull_BareNoProjectID(t *testing.T) {
 	env := newTestEnv(t)
-	// gosf.toml exists but has no [project].id and no entries.
-	env.writeFile(".gosf/gosf.toml", "")
+	// datapin.toml exists but has no [project].id and no entries.
+	env.writeFile(".datapin/datapin.toml", "")
 
 	_, stderr, code := env.run("pull")
 	if code == 0 {
 		t.Error("expected error for bare pull with no project configured")
 	}
-	if !strings.Contains(stderr, "gosf init") {
-		t.Errorf("error should mention 'gosf init': %s", stderr)
+	if !strings.Contains(stderr, "datapin init") {
+		t.Errorf("error should mention 'datapin init': %s", stderr)
 	}
 }
 
@@ -354,7 +354,7 @@ func TestPull_BareNoProjectID(t *testing.T) {
 func TestPull_BareLeavesUnpushedLocalFileAlone(t *testing.T) {
 	env := newTestEnv(t)
 	env.srv.AddProject("abc12", "Test Project")
-	env.writeFile(".gosf/gosf.toml", `[project]
+	env.writeFile(".datapin/datapin.toml", `[project]
 id = "abc12"
 
 [[files]]
@@ -484,36 +484,36 @@ func TestPush_JSON(t *testing.T) {
 func TestPush_AutoTracksFile(t *testing.T) {
 	env := newTestEnv(t)
 	env.srv.AddProject("abc12", "Test Project")
-	env.writeFile(".gosf/gosf.toml", "[project]\nid = \"abc12\"\n")
+	env.writeFile(".datapin/datapin.toml", "[project]\nid = \"abc12\"\n")
 	env.writeFile("data.csv", "col1,col2\n1,2\n")
 
 	_, stderr, code := env.run("push", "data.csv", "abc12:/data.csv", "--quiet")
 	if code != 0 {
 		t.Fatalf("push exit %d; stderr=%s", code, stderr)
 	}
-	toml := env.readFile(".gosf/gosf.toml")
+	toml := env.readFile(".datapin/datapin.toml")
 	if !strings.Contains(toml, "/data.csv") {
-		t.Errorf("expected /data.csv in gosf.toml:\n%s", toml)
+		t.Errorf("expected /data.csv in datapin.toml:\n%s", toml)
 	}
 	if strings.Contains(toml, "direction") {
 		t.Errorf("direction is no longer written to the manifest:\n%s", toml)
 	}
 	if !strings.Contains(toml, "version = 1") {
-		t.Errorf("expected version = 1 in gosf.toml:\n%s", toml)
+		t.Errorf("expected version = 1 in datapin.toml:\n%s", toml)
 	}
 }
 
 func TestPush_NoTrack(t *testing.T) {
 	env := newTestEnv(t)
 	env.srv.AddProject("abc12", "Test Project")
-	env.writeFile(".gosf/gosf.toml", "[project]\nid = \"abc12\"\n")
+	env.writeFile(".datapin/datapin.toml", "[project]\nid = \"abc12\"\n")
 	env.writeFile("data.csv", "content")
 
 	_, stderr, code := env.run("push", "data.csv", "abc12:/data.csv", "--no-track", "--quiet")
 	if code != 0 {
 		t.Fatalf("push exit %d; stderr=%s", code, stderr)
 	}
-	toml := env.readFile(".gosf/gosf.toml")
+	toml := env.readFile(".datapin/datapin.toml")
 	if strings.Contains(toml, "data.csv") {
 		t.Errorf("--no-track: manifest should not contain data.csv:\n%s", toml)
 	}
@@ -522,7 +522,7 @@ func TestPush_NoTrack(t *testing.T) {
 func TestPush_DuplicateRemoteConflict(t *testing.T) {
 	env := newTestEnv(t)
 	env.srv.AddProject("abc12", "Test Project")
-	env.writeFile(".gosf/gosf.toml", `[project]
+	env.writeFile(".datapin/datapin.toml", `[project]
 id = "abc12"
 
 [[files]]
@@ -547,7 +547,7 @@ func TestPush_BarePushFollowsManifest(t *testing.T) {
 	env.srv.AddProject("abc12", "Test Project")
 	env.srv.AddFolder("abc12", "/data") // destination folder must exist to upload into it
 	env.writeFile("data/report.csv", "report data")
-	env.writeFile(".gosf/gosf.toml", `[project]
+	env.writeFile(".datapin/datapin.toml", `[project]
 id = "abc12"
 
 [[files]]
@@ -570,7 +570,7 @@ md5 = ""
 	if uploads[0].Path != "/data/report.csv" {
 		t.Errorf("upload path = %q, want /data/report.csv", uploads[0].Path)
 	}
-	toml := env.readFile(".gosf/gosf.toml")
+	toml := env.readFile(".datapin/datapin.toml")
 	if !strings.Contains(toml, "version = 1") {
 		t.Errorf("expected version = 1 after bare push:\n%s", toml)
 	}
@@ -578,14 +578,14 @@ md5 = ""
 
 func TestPush_BarePushNoProjectID(t *testing.T) {
 	env := newTestEnv(t)
-	env.writeFile(".gosf/gosf.toml", "")
+	env.writeFile(".datapin/datapin.toml", "")
 
 	_, stderr, code := env.run("push")
 	if code == 0 {
 		t.Error("expected error for bare push with no project configured")
 	}
-	if !strings.Contains(stderr, "gosf init") {
-		t.Errorf("error should mention 'gosf init': %s", stderr)
+	if !strings.Contains(stderr, "datapin init") {
+		t.Errorf("error should mention 'datapin init': %s", stderr)
 	}
 }
 
@@ -598,7 +598,7 @@ func TestPush_BareSkipsEntriesWithNothingToPublish(t *testing.T) {
 	env.srv.AddFolder("abc12", "/data")
 	f := env.srv.AddFile("abc12", "/data/input.csv", []byte("reference data"))
 	env.writeFile("data/input.csv", "reference data")
-	env.writeFile(".gosf/gosf.toml", fmt.Sprintf(`[project]
+	env.writeFile(".datapin/datapin.toml", fmt.Sprintf(`[project]
 id = "abc12"
 
 [[files]]
@@ -625,7 +625,7 @@ func TestPush_BarePublishesLocallyModifiedEntry(t *testing.T) {
 	env.srv.AddFolder("abc12", "/data")
 	f := env.srv.AddFile("abc12", "/data/notes.csv", []byte("original"))
 	env.writeFile("data/notes.csv", "edited locally")
-	env.writeFile(".gosf/gosf.toml", fmt.Sprintf(`[project]
+	env.writeFile(".datapin/datapin.toml", fmt.Sprintf(`[project]
 id = "abc12"
 
 [[files]]
@@ -653,15 +653,15 @@ md5       = "%s"
 
 // AHEAD_OF_MANIFEST is genuinely ambiguous — the same difference means
 // "publish this" for a generated output and "throw this away" for an edited
-// input — so sync reports it, transfers nothing, and exits non-zero. `gosf push`
-// and `gosf pull --force` are the two ways to say which one you meant (#81).
+// input — so sync reports it, transfers nothing, and exits non-zero. `datapin push`
+// and `datapin pull --force` are the two ways to say which one you meant (#81).
 func TestSync_AheadIsReportedNotPushed(t *testing.T) {
 	env := newTestEnv(t)
 	env.srv.AddProject("abc12", "Test Project")
 	f := env.srv.AddFile("abc12", "/data.csv", []byte("original"))
 
 	env.writeFile("data.csv", "modified content")
-	env.writeFile(".gosf/gosf.toml", fmt.Sprintf(`[project]
+	env.writeFile(".datapin/datapin.toml", fmt.Sprintf(`[project]
 id = "abc12"
 
 [[files]]
@@ -681,11 +681,11 @@ md5       = "%s"
 	if !strings.Contains(stderr, "locally modified") {
 		t.Errorf("sync should say what it found; stderr=%s", stderr)
 	}
-	if toml := env.readFile(".gosf/gosf.toml"); !strings.Contains(toml, "version   = 1") {
+	if toml := env.readFile(".datapin/datapin.toml"); !strings.Contains(toml, "version   = 1") {
 		t.Errorf("the pin must be left alone:\n%s", toml)
 	}
 
-	// `gosf push` is the verb that means "publish it".
+	// `datapin push` is the verb that means "publish it".
 	if _, pstderr, pcode := env.run("push", "--yes", "--quiet"); pcode != 0 {
 		t.Fatalf("push exit %d; stderr=%s", pcode, pstderr)
 	}
@@ -696,12 +696,12 @@ md5       = "%s"
 	if string(uploads[0].Content) != "modified content" {
 		t.Errorf("upload content = %q", uploads[0].Content)
 	}
-	if toml := env.readFile(".gosf/gosf.toml"); !strings.Contains(toml, "version = 2") {
+	if toml := env.readFile(".datapin/datapin.toml"); !strings.Contains(toml, "version = 2") {
 		t.Errorf("expected version = 2 after push:\n%s", toml)
 	}
 }
 
-// The other half: `gosf sync --force` discards the local edit and restores the
+// The other half: `datapin sync --force` discards the local edit and restores the
 // tracked version instead.
 func TestSync_ForceDiscardsLocalModification(t *testing.T) {
 	env := newTestEnv(t)
@@ -709,7 +709,7 @@ func TestSync_ForceDiscardsLocalModification(t *testing.T) {
 	f := env.srv.AddFile("abc12", "/data.csv", []byte("original"))
 
 	env.writeFile("data.csv", "modified content")
-	env.writeFile(".gosf/gosf.toml", fmt.Sprintf(`[project]
+	env.writeFile(".datapin/datapin.toml", fmt.Sprintf(`[project]
 id = "abc12"
 
 [[files]]
@@ -736,7 +736,7 @@ func TestSync_PullsMissingFile(t *testing.T) {
 	env.srv.AddProject("abc12", "Test Project")
 	f := env.srv.AddFile("abc12", "/data.csv", []byte("remote content"))
 
-	env.writeFile(".gosf/gosf.toml", fmt.Sprintf(`[project]
+	env.writeFile(".datapin/datapin.toml", fmt.Sprintf(`[project]
 id = "abc12"
 
 [[files]]
@@ -766,7 +766,7 @@ func TestSync_PullsAndPushes(t *testing.T) {
 	// NOT_PUSHED with local content → sync uploads it.
 	env.writeFile("push-me.csv", "modified locally")
 	// MISSING (file doesn't exist locally) → sync downloads it.
-	env.writeFile(".gosf/gosf.toml", fmt.Sprintf(`[project]
+	env.writeFile(".datapin/datapin.toml", fmt.Sprintf(`[project]
 id = "abc12"
 
 [[files]]
@@ -805,7 +805,7 @@ md5       = "%s"
 
 func TestSync_NoProjectID(t *testing.T) {
 	env := newTestEnv(t)
-	env.writeFile(".gosf/gosf.toml", `[project]
+	env.writeFile(".datapin/datapin.toml", `[project]
 id = ""
 `)
 
@@ -813,8 +813,8 @@ id = ""
 	if code == 0 {
 		t.Fatal("expected non-zero exit when no project id configured")
 	}
-	if !strings.Contains(stderr, "gosf init") {
-		t.Errorf("expected 'gosf init' in stderr; got %q", stderr)
+	if !strings.Contains(stderr, "datapin init") {
+		t.Errorf("expected 'datapin init' in stderr; got %q", stderr)
 	}
 }
 
@@ -825,7 +825,7 @@ func TestSync_DryRun(t *testing.T) {
 
 	_ = f
 	env.writeFile("data.csv", "changed")
-	env.writeFile(".gosf/gosf.toml", `[project]
+	env.writeFile(".datapin/datapin.toml", `[project]
 id = "abc12"
 
 [[files]]
@@ -856,7 +856,7 @@ func TestSync_JSON(t *testing.T) {
 	f := env.srv.AddFile("abc12", "/report.csv", []byte("v1"))
 
 	env.writeFile("report.csv", "v1") // in sync
-	env.writeFile(".gosf/gosf.toml", fmt.Sprintf(`[project]
+	env.writeFile(".datapin/datapin.toml", fmt.Sprintf(`[project]
 id = "abc12"
 
 [[files]]
@@ -892,7 +892,7 @@ func TestStatus_JSON_States(t *testing.T) {
 	env.writeFile("synced.csv", "synced") // matches pinned MD5 → IN_SYNC
 	// missing.csv does not exist locally → MISSING
 
-	env.writeFile(".gosf/gosf.toml", fmt.Sprintf(`[project]
+	env.writeFile(".datapin/datapin.toml", fmt.Sprintf(`[project]
 id = "abc12"
 
 [[files]]
@@ -937,7 +937,7 @@ func TestStatus_ExitCode(t *testing.T) {
 	f := env.srv.AddFile("abc12", "/ok.csv", []byte("ok"))
 
 	env.writeFile("ok.csv", "ok")
-	env.writeFile(".gosf/gosf.toml", fmt.Sprintf(`[project]
+	env.writeFile(".datapin/datapin.toml", fmt.Sprintf(`[project]
 id = "abc12"
 
 [[files]]
@@ -965,12 +965,12 @@ func TestAdd_FetchesRemoteVersion(t *testing.T) {
 		t.Fatalf("add exit %d; stderr=%s", code, stderr)
 	}
 
-	toml := env.readFile(".gosf/gosf.toml")
+	toml := env.readFile(".datapin/datapin.toml")
 	if !strings.Contains(toml, "version = 1") {
-		t.Errorf("expected version = 1 in gosf.toml:\n%s", toml)
+		t.Errorf("expected version = 1 in datapin.toml:\n%s", toml)
 	}
 	if !strings.Contains(toml, f.VersionMD5(1)) {
-		t.Errorf("expected md5 %q in gosf.toml:\n%s", f.VersionMD5(1), toml)
+		t.Errorf("expected md5 %q in datapin.toml:\n%s", f.VersionMD5(1), toml)
 	}
 	if strings.Contains(toml, "direction") {
 		t.Errorf("direction is no longer written to the manifest:\n%s", toml)
@@ -987,9 +987,9 @@ func TestAdd_NoRemoteFile(t *testing.T) {
 		t.Fatalf("add exit %d; stderr=%s", code, stderr)
 	}
 
-	toml := env.readFile(".gosf/gosf.toml")
+	toml := env.readFile(".datapin/datapin.toml")
 	if !strings.Contains(toml, "version = 0") {
-		t.Errorf("expected version = 0 in gosf.toml:\n%s", toml)
+		t.Errorf("expected version = 0 in datapin.toml:\n%s", toml)
 	}
 }
 
@@ -1026,22 +1026,22 @@ func TestInit_CreatesGOSFToml(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("init exit %d; stderr=%s", code, stderr)
 	}
-	toml := env.readFile(".gosf/gosf.toml")
+	toml := env.readFile(".datapin/datapin.toml")
 	if !strings.Contains(toml, "abc12") {
-		t.Errorf("expected abc12 in gosf.toml:\n%s", toml)
+		t.Errorf("expected abc12 in datapin.toml:\n%s", toml)
 	}
 }
 
 func TestInit_UpdatesProject(t *testing.T) {
 	env := newTestEnv(t)
-	env.writeFile(".gosf/gosf.toml", "[project]\nid = \"old12\"\n")
+	env.writeFile(".datapin/datapin.toml", "[project]\nid = \"old12\"\n")
 	_, stderr, code := env.run("init", "new99")
 	if code != 0 {
 		t.Fatalf("init exit %d; stderr=%s", code, stderr)
 	}
-	toml := env.readFile(".gosf/gosf.toml")
+	toml := env.readFile(".datapin/datapin.toml")
 	if !strings.Contains(toml, "new99") {
-		t.Errorf("expected new99 in gosf.toml:\n%s", toml)
+		t.Errorf("expected new99 in datapin.toml:\n%s", toml)
 	}
 	if strings.Contains(toml, "old12") {
 		t.Errorf("old project id should be gone:\n%s", toml)
@@ -1071,15 +1071,15 @@ func TestInit_JSON(t *testing.T) {
 func TestAdd_NoDestMirrorsPath(t *testing.T) {
 	env := newTestEnv(t)
 	env.srv.AddProject("abc12", "Test Project")
-	env.writeFile(".gosf/gosf.toml", "[project]\nid = \"abc12\"\n")
+	env.writeFile(".datapin/datapin.toml", "[project]\nid = \"abc12\"\n")
 
 	_, stderr, code := env.run("add", "data/file.txt")
 	if code != 0 {
 		t.Fatalf("add exit %d; stderr=%s", code, stderr)
 	}
-	toml := env.readFile(".gosf/gosf.toml")
+	toml := env.readFile(".datapin/datapin.toml")
 	if !strings.Contains(toml, "/data/file.txt") {
-		t.Errorf("expected /data/file.txt in gosf.toml:\n%s", toml)
+		t.Errorf("expected /data/file.txt in datapin.toml:\n%s", toml)
 	}
 	if strings.Contains(toml, "direction") {
 		t.Errorf("direction is no longer written to the manifest:\n%s", toml)
@@ -1089,22 +1089,22 @@ func TestAdd_NoDestMirrorsPath(t *testing.T) {
 func TestAdd_DestDirectory(t *testing.T) {
 	env := newTestEnv(t)
 	env.srv.AddProject("abc12", "Test Project")
-	env.writeFile(".gosf/gosf.toml", "[project]\nid = \"abc12\"\n")
+	env.writeFile(".datapin/datapin.toml", "[project]\nid = \"abc12\"\n")
 
 	_, stderr, code := env.run("add", "local/file.txt", "abc12:/results/")
 	if code != 0 {
 		t.Fatalf("add exit %d; stderr=%s", code, stderr)
 	}
-	toml := env.readFile(".gosf/gosf.toml")
+	toml := env.readFile(".datapin/datapin.toml")
 	if !strings.Contains(toml, "/results/file.txt") {
-		t.Errorf("expected /results/file.txt in gosf.toml:\n%s", toml)
+		t.Errorf("expected /results/file.txt in datapin.toml:\n%s", toml)
 	}
 }
 
 func TestAdd_DirectoryRecursion(t *testing.T) {
 	env := newTestEnv(t)
 	env.srv.AddProject("abc12", "Test Project")
-	env.writeFile(".gosf/gosf.toml", "[project]\nid = \"abc12\"\n")
+	env.writeFile(".datapin/datapin.toml", "[project]\nid = \"abc12\"\n")
 	env.writeFile("data/dir/file1.txt", "content")
 	env.writeFile("data/dir/sub/file2.txt", "content")
 
@@ -1113,7 +1113,7 @@ func TestAdd_DirectoryRecursion(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("add exit %d; stderr=%s", code, stderr)
 	}
-	toml := env.readFile(".gosf/gosf.toml")
+	toml := env.readFile(".datapin/datapin.toml")
 	if !strings.Contains(toml, "/results/dir/file1.txt") {
 		t.Errorf("expected /results/dir/file1.txt:\n%s", toml)
 	}
@@ -1125,7 +1125,7 @@ func TestAdd_DirectoryRecursion(t *testing.T) {
 func TestAdd_DirTrailingSlash(t *testing.T) {
 	env := newTestEnv(t)
 	env.srv.AddProject("abc12", "Test Project")
-	env.writeFile(".gosf/gosf.toml", "[project]\nid = \"abc12\"\n")
+	env.writeFile(".datapin/datapin.toml", "[project]\nid = \"abc12\"\n")
 	env.writeFile("data/dir/file.txt", "content")
 
 	// Trailing slash: dir name stripped, contents go directly under dest.
@@ -1133,7 +1133,7 @@ func TestAdd_DirTrailingSlash(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("add exit %d; stderr=%s", code, stderr)
 	}
-	toml := env.readFile(".gosf/gosf.toml")
+	toml := env.readFile(".datapin/datapin.toml")
 	if !strings.Contains(toml, "/results/file.txt") {
 		t.Errorf("expected /results/file.txt (dir name stripped):\n%s", toml)
 	}
@@ -1142,7 +1142,7 @@ func TestAdd_DirTrailingSlash(t *testing.T) {
 func TestAdd_DirectionFlagRemoved(t *testing.T) {
 	env := newTestEnv(t)
 	env.srv.AddProject("abc12", "Test Project")
-	env.writeFile(".gosf/gosf.toml", "[project]\nid = \"abc12\"\n")
+	env.writeFile(".datapin/datapin.toml", "[project]\nid = \"abc12\"\n")
 
 	_, _, code := env.run("add", "file.txt", "abc12:/file.txt", "--direction=pull")
 	if code == 0 {
@@ -1153,7 +1153,7 @@ func TestAdd_DirectionFlagRemoved(t *testing.T) {
 func TestAdd_AlreadyTracked(t *testing.T) {
 	env := newTestEnv(t)
 	env.srv.AddProject("abc12", "Test Project")
-	env.writeFile(".gosf/gosf.toml", `[project]
+	env.writeFile(".datapin/datapin.toml", `[project]
 id = "abc12"
 
 [[files]]
@@ -1508,8 +1508,8 @@ func TestProjects_NoToken(t *testing.T) {
 	cmd := exec.Command(binaryPath, "projects")
 	cmd.Dir = env.dir
 	cmd.Env = append(os.Environ(),
-		"GOSF_API_BASE="+env.srv.URL()+"/v2",
-		"GOSF_FILES_BASE="+env.srv.URL(),
+		"DATAPIN_API_BASE="+env.srv.URL()+"/v2",
+		"DATAPIN_FILES_BASE="+env.srv.URL(),
 		"OSF_TOKEN=",
 		"HOME="+env.dir,
 		"XDG_CONFIG_HOME="+filepath.Join(env.dir, ".config"),
@@ -1859,7 +1859,7 @@ func TestPull_IdempotentWhenLocalIdentical(t *testing.T) {
 	if env.readFile("ml/clade/a.csv") != a {
 		t.Error("a.csv content changed unexpectedly")
 	}
-	mani := env.readFile(".gosf/gosf.toml")
+	mani := env.readFile(".datapin/datapin.toml")
 	for _, want := range []string{"ml/clade/a.csv", "ml/clade/b.csv"} {
 		if !strings.Contains(mani, want) {
 			t.Errorf("manifest missing %q:\n%s", want, mani)
@@ -1881,7 +1881,7 @@ func TestStatus_UnpinnedContentMatchIsPinOnly(t *testing.T) {
 	env.srv.AddProject("abc12", "Test Project")
 	env.srv.AddFile("abc12", "/inputs/x.csv", []byte("payload"))
 	env.writeFile("inputs/x.csv", "payload")
-	env.writeFile(".gosf/gosf.toml", `[project]
+	env.writeFile(".datapin/datapin.toml", `[project]
 id = "abc12"
 
 [[files]]
@@ -1911,7 +1911,7 @@ func TestSync_PinsUnpinnedIdentical(t *testing.T) {
 	env.srv.AddProject("abc12", "Test Project")
 	env.srv.AddFile("abc12", "/inputs/x.csv", []byte("payload"))
 	env.writeFile("inputs/x.csv", "payload")
-	env.writeFile(".gosf/gosf.toml", `[project]
+	env.writeFile(".datapin/datapin.toml", `[project]
 id = "abc12"
 
 [[files]]
@@ -1928,7 +1928,7 @@ md5       = ""
 	if len(env.srv.Uploads()) != 0 {
 		t.Errorf("sync uploaded %d files; expected 0 (content identical)", len(env.srv.Uploads()))
 	}
-	mani := env.readFile(".gosf/gosf.toml")
+	mani := env.readFile(".datapin/datapin.toml")
 	if strings.Contains(mani, "version = 0") {
 		t.Errorf("entry should be pinned after sync:\n%s", mani)
 	}
@@ -1942,7 +1942,7 @@ func TestSync_RemoteNewerFastForwardPull(t *testing.T) {
 	f := env.srv.AddFile("abc12", "/data.csv", []byte("v1-content"))
 	env.srv.AddVersion("abc12", "/data.csv", []byte("v2-content"))
 	env.writeFile("data.csv", "v1-content")
-	env.writeFile(".gosf/gosf.toml", fmt.Sprintf(`[project]
+	env.writeFile(".datapin/datapin.toml", fmt.Sprintf(`[project]
 id = "abc12"
 
 [[files]]
@@ -1959,7 +1959,7 @@ md5       = "%s"
 	if got := env.readFile("data.csv"); got != "v2-content" {
 		t.Errorf("expected fast-forward to v2 content, got %q", got)
 	}
-	mani := env.readFile(".gosf/gosf.toml")
+	mani := env.readFile(".datapin/datapin.toml")
 	if !strings.Contains(mani, "version = 2") {
 		t.Errorf("expected re-pin to v2:\n%s", mani)
 	}
@@ -1973,7 +1973,7 @@ func TestSync_DivergenceFailsHard(t *testing.T) {
 	f := env.srv.AddFile("abc12", "/species.csv", []byte("baseline"))
 	env.srv.AddVersion("abc12", "/species.csv", []byte("remote-edit"))
 	env.writeFile("species.csv", "local-edit")
-	env.writeFile(".gosf/gosf.toml", fmt.Sprintf(`[project]
+	env.writeFile(".datapin/datapin.toml", fmt.Sprintf(`[project]
 id = "abc12"
 
 [[files]]
@@ -1999,12 +1999,12 @@ md5       = "%s"
 }
 
 // TestPush_JSONRequiresForce verifies a push writing remote bytes in JSON mode
-// refuses without --force (no prompt possible), mirroring `gosf rm`.
+// refuses without --force (no prompt possible), mirroring `datapin rm`.
 func TestPush_JSONRequiresForce(t *testing.T) {
 	env := newTestEnv(t)
 	env.srv.AddProject("abc12", "Test Project")
 	env.writeFile("new.csv", "brand new content")
-	env.writeFile(".gosf/gosf.toml", `[project]
+	env.writeFile(".datapin/datapin.toml", `[project]
 id = "abc12"
 
 [[files]]
@@ -2192,7 +2192,7 @@ func TestLs_ForbiddenProject_FriendlyAuthError(t *testing.T) {
 	if code == 0 {
 		t.Fatal("ls of a forbidden project should fail")
 	}
-	if !strings.Contains(stderr, "gosf auth login") || !strings.Contains(stderr, "403") {
+	if !strings.Contains(stderr, "datapin auth login") || !strings.Contains(stderr, "403") {
 		t.Errorf("expected a friendly 403 auth hint, got %q", stderr)
 	}
 }
@@ -2203,7 +2203,7 @@ func TestPull_ForbiddenProject_FriendlyAuthError(t *testing.T) {
 	env.srv.SetForbidden("priv02")
 
 	_, stderr, code := env.run("pull", "priv02:/x.csv", "--no-track")
-	if code == 0 || !strings.Contains(stderr, "gosf auth login") {
+	if code == 0 || !strings.Contains(stderr, "datapin auth login") {
 		t.Errorf("expected a friendly 403 auth hint on pull; code=%d stderr=%q", code, stderr)
 	}
 }
@@ -2290,7 +2290,7 @@ func TestStatus_MalformedManifest(t *testing.T) {
 	env := newTestEnv(t)
 	env.srv.AddProject("abc12", "Test")
 	// Two entries claiming the same local path → load must fail.
-	env.writeFile(".gosf/gosf.toml", `[project]
+	env.writeFile(".datapin/datapin.toml", `[project]
 id = "abc12"
 
 [[files]]
@@ -2309,15 +2309,15 @@ version = 0
 	}
 }
 
-// A manifest written by gosf <= 1.9 still carries `direction` on every entry.
+// A manifest written by datapin <= 1.9 still carries `direction` on every entry.
 // It must keep working: the key is ignored with a warning, never an error, and
-// it is dropped the next time gosf writes the file (#81).
+// it is dropped the next time datapin writes the file (#81).
 func TestStatus_LegacyDirectionManifestStillWorks(t *testing.T) {
 	env := newTestEnv(t)
 	env.srv.AddProject("abc12", "Test")
 	f := env.srv.AddFile("abc12", "/x.csv", []byte("data"))
 	env.writeFile("x.csv", "data")
-	env.writeFile(".gosf/gosf.toml", fmt.Sprintf(`[project]
+	env.writeFile(".datapin/datapin.toml", fmt.Sprintf(`[project]
 id = "abc12"
 
 [[files]]
@@ -2343,8 +2343,8 @@ func TestStatus_NoManifest_SuggestsInit(t *testing.T) {
 	if code == 0 {
 		t.Fatal("status without a manifest should fail")
 	}
-	if !strings.Contains(stderr, "gosf init") {
-		t.Errorf("missing-manifest error should suggest 'gosf init', got %q", stderr)
+	if !strings.Contains(stderr, "datapin init") {
+		t.Errorf("missing-manifest error should suggest 'datapin init', got %q", stderr)
 	}
 }
 
@@ -2375,7 +2375,7 @@ func syncPushEnv(t *testing.T) *testEnv {
 	env := newTestEnv(t)
 	env.srv.AddProject("abc12", "Test Project")
 	env.writeFile("data.csv", "new content")
-	env.writeFile(".gosf/gosf.toml", `[project]
+	env.writeFile(".datapin/datapin.toml", `[project]
 id = "abc12"
 
 [[files]]
@@ -2547,7 +2547,7 @@ func TestStatus_SkipsVersionHistoryWhenInSync(t *testing.T) {
 	f2 := env.srv.AddFile("abc12", "/b.csv", []byte("bbb"))
 	env.writeFile("a.csv", "aaa")
 	env.writeFile("b.csv", "bbb")
-	env.writeFile(".gosf/gosf.toml", fmt.Sprintf(`[project]
+	env.writeFile(".datapin/datapin.toml", fmt.Sprintf(`[project]
 id = "abc12"
 
 [[files]]
@@ -2583,7 +2583,7 @@ func TestStatus_FetchesVersionHistoryWhenLocalDiffers(t *testing.T) {
 	// differs from both baseline and remote latest → BEHIND, which needs the
 	// version history to recognize "v1" as a known older version.
 	env.writeFile("a.csv", "v1")
-	env.writeFile(".gosf/gosf.toml", fmt.Sprintf(`[project]
+	env.writeFile(".datapin/datapin.toml", fmt.Sprintf(`[project]
 id = "abc12"
 
 [[files]]
@@ -2616,7 +2616,7 @@ func TestSync_UnpushedEntryRemoteExists_DiffersPushesNewVersion(t *testing.T) {
 	env.srv.AddFile("abc12", "/ml/plan.md", []byte("remote original"))
 
 	env.writeFile("ml/plan.md", "local changed content")
-	env.writeFile(".gosf/gosf.toml", `[project]
+	env.writeFile(".datapin/datapin.toml", `[project]
 id = "abc12"
 
 [[files]]
@@ -2635,7 +2635,7 @@ md5       = ""
 		t.Fatal("expected a new-version upload")
 	}
 	// Manifest is repaired to the new remote version (v2) with the new md5.
-	toml := env.readFile(".gosf/gosf.toml")
+	toml := env.readFile(".datapin/datapin.toml")
 	if !strings.Contains(toml, "version = 2") {
 		t.Errorf("expected version = 2 after new-version push; got:\n%s", toml)
 	}
@@ -2650,7 +2650,7 @@ func TestSync_UnpushedEntryRemoteExists_IdenticalPinsNoTransfer(t *testing.T) {
 	f := env.srv.AddFile("abc12", "/ml/plan.md", []byte("same bytes"))
 
 	env.writeFile("ml/plan.md", "same bytes")
-	env.writeFile(".gosf/gosf.toml", `[project]
+	env.writeFile(".datapin/datapin.toml", `[project]
 id = "abc12"
 
 [[files]]
@@ -2667,7 +2667,7 @@ md5       = ""
 	if len(env.srv.Uploads()) != 0 {
 		t.Errorf("identical content should not upload; got %d uploads", len(env.srv.Uploads()))
 	}
-	toml := env.readFile(".gosf/gosf.toml")
+	toml := env.readFile(".datapin/datapin.toml")
 	if !strings.Contains(toml, "version = 1") || !strings.Contains(toml, f.VersionMD5(1)) {
 		t.Errorf("expected pin to remote v1 (%s); got:\n%s", f.VersionMD5(1), toml)
 	}
@@ -2678,7 +2678,7 @@ md5       = ""
 // The bug: `sync` refused to create files that exist on the remote but not
 // locally, and no flag changed it. Every entry here is MISSING with content on
 // the remote — including entries still carrying each of the three legacy
-// `direction` values — and a plain `gosf sync` must restore all of them.
+// `direction` values — and a plain `datapin sync` must restore all of them.
 func TestSync_RestoresMissingFilesWithNoFlags(t *testing.T) {
 	env := newTestEnv(t)
 	env.srv.AddProject("abc12", "Test Project")
@@ -2703,7 +2703,7 @@ version   = 1
 md5       = %q
 `, f.local, f.remote, f.legacy, file.VersionMD5(1))
 	}
-	env.writeFile(".gosf/gosf.toml", toml)
+	env.writeFile(".datapin/datapin.toml", toml)
 
 	_, stderr, code := env.run("sync")
 	if code != 0 {
@@ -2729,7 +2729,7 @@ func TestSync_RestoresMissingUnpinnedEntry(t *testing.T) {
 	env := newTestEnv(t)
 	env.srv.AddProject("abc12", "Test Project")
 	env.srv.AddFile("abc12", "/data.csv", []byte("remote only"))
-	env.writeFile(".gosf/gosf.toml", `[project]
+	env.writeFile(".datapin/datapin.toml", `[project]
 id = "abc12"
 
 [[files]]
@@ -2746,7 +2746,7 @@ md5     = ""
 	if got := env.readFile("data.csv"); got != "remote only" {
 		t.Errorf("data.csv = %q", got)
 	}
-	if mani := env.readFile(".gosf/gosf.toml"); !strings.Contains(mani, "version = 1") {
+	if mani := env.readFile(".datapin/datapin.toml"); !strings.Contains(mani, "version = 1") {
 		t.Errorf("the restored entry should be pinned:\n%s", mani)
 	}
 }
@@ -2762,7 +2762,7 @@ func divergedEnv(t *testing.T, legacyDirection string) *testEnv {
 	baseline := f.VersionMD5(1)
 	env.srv.AddVersion("abc12", "/data.csv", []byte("remote edit"))
 	env.writeFile("data.csv", "local edit")
-	env.writeFile(".gosf/gosf.toml", fmt.Sprintf(`[project]
+	env.writeFile(".datapin/datapin.toml", fmt.Sprintf(`[project]
 id = "abc12"
 
 [[files]]
@@ -2828,7 +2828,7 @@ func TestSync_LegacyBothEntryFastForwards(t *testing.T) {
 	baseline := f.VersionMD5(1)
 	env.srv.AddVersion("abc12", "/data.csv", []byte("v2 content"))
 	env.writeFile("data.csv", "v1 content")
-	env.writeFile(".gosf/gosf.toml", fmt.Sprintf(`[project]
+	env.writeFile(".datapin/datapin.toml", fmt.Sprintf(`[project]
 id = "abc12"
 
 [[files]]
@@ -2851,7 +2851,7 @@ md5       = "%s"
 	}
 }
 
-// `gosf pull` over a subtree used to replace whole manifest entries, flipping
+// `datapin pull` over a subtree used to replace whole manifest entries, flipping
 // tracked outputs to direction=pull and quietly stopping them from being
 // published again. Pulling must leave later sync/push behaviour unchanged.
 func TestPull_SubtreeDoesNotChangeLaterPushBehaviour(t *testing.T) {
@@ -2860,7 +2860,7 @@ func TestPull_SubtreeDoesNotChangeLaterPushBehaviour(t *testing.T) {
 	env.srv.AddFolder("abc12", "/data")
 	f := env.srv.AddFile("abc12", "/data/out.csv", []byte("published v1"))
 	env.writeFile("data/out.csv", "published v1")
-	env.writeFile(".gosf/gosf.toml", fmt.Sprintf(`[project]
+	env.writeFile(".datapin/datapin.toml", fmt.Sprintf(`[project]
 id = "abc12"
 
 [[files]]
@@ -2894,14 +2894,14 @@ md5     = "%s"
 // `sync` only ever visits entries in the manifest, so remote files with no entry
 // are structurally invisible. --track-only registers a remote subtree without
 // transferring anything, so a large project can be adopted and reviewed before
-// it is downloaded; a plain `gosf sync` then fetches it.
+// it is downloaded; a plain `datapin sync` then fetches it.
 func TestPull_TrackOnlyRegistersWithoutDownloading(t *testing.T) {
 	env := newTestEnv(t)
 	env.srv.AddProject("abc12", "Test Project")
 	env.srv.AddFolder("abc12", "/data")
 	a := env.srv.AddFile("abc12", "/data/a.csv", []byte("alpha"))
 	env.srv.AddFile("abc12", "/data/b.csv", []byte("beta"))
-	env.writeFile(".gosf/gosf.toml", "[project]\nid = \"abc12\"\n")
+	env.writeFile(".datapin/datapin.toml", "[project]\nid = \"abc12\"\n")
 
 	_, stderr, code := env.run("pull", "abc12:/data/", "data/", "--track-only")
 	if code != 0 {
@@ -2911,7 +2911,7 @@ func TestPull_TrackOnlyRegistersWithoutDownloading(t *testing.T) {
 		t.Fatal("--track-only must not transfer any bytes")
 	}
 
-	mani := env.readFile(".gosf/gosf.toml")
+	mani := env.readFile(".datapin/datapin.toml")
 	for _, want := range []string{"data/a.csv", "data/b.csv", "/data/a.csv", "/data/b.csv"} {
 		if !strings.Contains(mani, want) {
 			t.Errorf("manifest missing %q:\n%s", want, mani)
@@ -2959,7 +2959,7 @@ func TestSync_RestoresMissingFileWithoutRemoteScan(t *testing.T) {
 	env := newTestEnv(t)
 	env.srv.AddProject("abc12", "Test Project")
 	f := env.srv.AddFile("abc12", "/data.csv", []byte("remote content"))
-	env.writeFile(".gosf/gosf.toml", fmt.Sprintf(`[project]
+	env.writeFile(".datapin/datapin.toml", fmt.Sprintf(`[project]
 id = "abc12"
 
 [[files]]
@@ -2980,7 +2980,7 @@ md5     = "%s"
 
 // ---- Issue #86: request efficiency and rate-limit resilience ----
 
-// OSF serves 10 items per page by default and caps at 100. gosf never asked for
+// OSF serves 10 items per page by default and caps at 100. datapin never asked for
 // a size, so a folder of 87 files cost 9 requests instead of 1 — the dominant
 // source of rate-limit pressure on a large manifest. fakeosf now paginates
 // exactly like OSF, so this measures the real thing.
@@ -3052,7 +3052,7 @@ func TestStatus_LargeManifestScanIsPageEfficient(t *testing.T) {
 		toml += fmt.Sprintf("\n[[files]]\nlocal = \"data/f%02d.csv\"\nremote = %q\nversion = 1\nmd5 = %q\n",
 			i, remote, f.VersionMD5(1))
 	}
-	env.writeFile(".gosf/gosf.toml", toml)
+	env.writeFile(".datapin/datapin.toml", toml)
 
 	before := env.srv.ListRequests()
 	_, stderr, code := env.run("status")

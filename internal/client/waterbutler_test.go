@@ -64,7 +64,7 @@ func TestUpload_ReturnsVersionAndMD5(t *testing.T) {
 	defer srv.Close()
 
 	// Write a tiny temp file to upload.
-	f, err := os.CreateTemp("", "gosf-upload-test-*")
+	f, err := os.CreateTemp("", "datapin-upload-test-*")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -25,16 +25,16 @@ var wikiGetCmd = &cobra.Command{
 	Long: `Fetch the markdown content of a wiki page. The page defaults to "home".
 
 By default the content is printed to stdout, so it pipes cleanly:
-  gosf wiki get abc12 | less
+  datapin wiki get abc12 | less
 
 With a dest argument the content is written to a file instead:
-  gosf wiki get abc12:protocol protocol.md
+  datapin wiki get abc12:protocol protocol.md
 
 Examples:
-  gosf wiki get abc12                      # home page to stdout
-  gosf wiki get "abc12:Analysis Notes"     # named page (quote spaces)
-  gosf wiki get abc12:home --version=2     # a historical version
-  gosf wiki get abc12:home docs/home.md    # write to a file`,
+  datapin wiki get abc12                      # home page to stdout
+  datapin wiki get "abc12:Analysis Notes"     # named page (quote spaces)
+  datapin wiki get abc12:home --version=2     # a historical version
+  datapin wiki get abc12:home docs/home.md    # write to a file`,
 	Args:         cobra.RangeArgs(1, 2),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {

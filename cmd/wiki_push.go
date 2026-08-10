@@ -26,9 +26,9 @@ When :<page> is omitted the page name is derived from the file name
 ("docs/Analysis Notes.md" → page "Analysis Notes").
 
 Examples:
-  gosf wiki push docs/home.md abc12:home
-  gosf wiki push "docs/Analysis Notes.md" abc12     # page "Analysis Notes"
-  gosf wiki push docs/home.md abc12:home --dry-run`,
+  datapin wiki push docs/home.md abc12:home
+  datapin wiki push "docs/Analysis Notes.md" abc12     # page "Analysis Notes"
+  datapin wiki push docs/home.md abc12:home --dry-run`,
 	Args:         cobra.ExactArgs(2),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -43,7 +43,7 @@ Examples:
 
 		token := config.LoadToken(flagToken)
 		if token == "" {
-			return fmt.Errorf("wiki push requires authentication — run 'gosf auth login' or set OSF_TOKEN")
+			return fmt.Errorf("wiki push requires authentication — run 'datapin auth login' or set OSF_TOKEN")
 		}
 
 		content, err := os.ReadFile(src)
