@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
-	"github.com/BU-Neuromics/gosf/internal/log"
+	"github.com/BU-Neuromics/datapin/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/log"
 )
 
 // friendlyAuthError converts a raw 401/403 from a read command (ls/info/pull/
@@ -19,7 +19,7 @@ func friendlyAuthError(err error) error {
 	var apiErr *client.APIError
 	if errors.As(err, &apiErr) && (apiErr.StatusCode == 401 || apiErr.StatusCode == 403) {
 		return fmt.Errorf("access denied (HTTP %d) — this project is private or the token is invalid; "+
-			"run 'gosf auth login' or set OSF_TOKEN to authenticate", apiErr.StatusCode)
+			"run 'datapin auth login' or set OSF_TOKEN to authenticate", apiErr.StatusCode)
 	}
 	return err
 }
@@ -42,10 +42,10 @@ func friendlyAPIError(err error, authenticated bool) error {
 	if apiErr.StatusCode == 429 {
 		if !authenticated {
 			return fmt.Errorf("OSF rate limit reached (HTTP 429) — this run was unauthenticated, "+
-				"which OSF limits to about 100 requests per hour. Run 'gosf auth login' (or set "+
+				"which OSF limits to about 100 requests per hour. Run 'datapin auth login' (or set "+
 				"OSF_TOKEN) for a far higher allowance, then try again.\n  (%s)", apiErr.Message)
 		}
-		return fmt.Errorf("OSF rate limit reached (HTTP 429) — gosf waited and retried, but the "+
+		return fmt.Errorf("OSF rate limit reached (HTTP 429) — datapin waited and retried, but the "+
 			"limit is still in force. Wait for the quota to reset and try again; "+
 			"'--jobs=1' spreads a large scan out more gently.\n  (%s)", apiErr.Message)
 	}
@@ -66,6 +66,6 @@ func shouldWarnUnauthenticated(token string, trackedEntries int) bool {
 func warnUnauthenticated(token string, trackedEntries int) {
 	if shouldWarnUnauthenticated(token, trackedEntries) {
 		log.Warnf("running unauthenticated — OSF limits anonymous use to about 100 requests/hour, " +
-			"which a manifest scan can exhaust; run 'gosf auth login' or set OSF_TOKEN")
+			"which a manifest scan can exhaust; run 'datapin auth login' or set OSF_TOKEN")
 	}
 }

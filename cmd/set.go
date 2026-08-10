@@ -7,10 +7,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
-	"github.com/BU-Neuromics/gosf/internal/config"
-	"github.com/BU-Neuromics/gosf/internal/output"
-	"github.com/BU-Neuromics/gosf/internal/resolver"
+	"github.com/BU-Neuromics/datapin/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/config"
+	"github.com/BU-Neuromics/datapin/internal/output"
+	"github.com/BU-Neuromics/datapin/internal/resolver"
 )
 
 var (
@@ -32,9 +32,9 @@ Available categories: analysis, communication, data, hypothesis,
 instrumentation, methods and measures, procedure, project, software, other.
 
 Examples:
-  gosf set abc12 --description "Processed with pipeline v2.1"
-  gosf set abc12 --title "Final Analysis" --category analysis
-  gosf set abc12 --tags processed,qc-passed`,
+  datapin set abc12 --description "Processed with pipeline v2.1"
+  datapin set abc12 --title "Final Analysis" --category analysis
+  datapin set abc12 --tags processed,qc-passed`,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -45,7 +45,7 @@ Examples:
 
 		token := config.LoadToken(flagToken)
 		if token == "" {
-			return fmt.Errorf("set requires authentication — run 'gosf auth login' or set OSF_TOKEN")
+			return fmt.Errorf("set requires authentication — run 'datapin auth login' or set OSF_TOKEN")
 		}
 
 		attrs := client.UpdateNodeAttrs{}

@@ -8,11 +8,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
-	"github.com/BU-Neuromics/gosf/internal/config"
-	"github.com/BU-Neuromics/gosf/internal/log"
-	"github.com/BU-Neuromics/gosf/internal/output"
-	"github.com/BU-Neuromics/gosf/internal/resolver"
+	"github.com/BU-Neuromics/datapin/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/config"
+	"github.com/BU-Neuromics/datapin/internal/log"
+	"github.com/BU-Neuromics/datapin/internal/output"
+	"github.com/BU-Neuromics/datapin/internal/resolver"
 )
 
 var (
@@ -29,9 +29,9 @@ Deleting a folder removes it and all its contents. You will be prompted
 for confirmation unless --yes is supplied.
 
 Examples:
-  gosf rm abc12:/data/old-results.csv
-  gosf rm abc12:/scratch/ --yes
-  gosf rm abc12:/data/file.csv --dry-run`,
+  datapin rm abc12:/data/old-results.csv
+  datapin rm abc12:/scratch/ --yes
+  datapin rm abc12:/data/file.csv --dry-run`,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -45,7 +45,7 @@ Examples:
 
 		token := config.LoadToken(flagToken)
 		if token == "" {
-			return fmt.Errorf("rm requires authentication — run 'gosf auth login' or set OSF_TOKEN")
+			return fmt.Errorf("rm requires authentication — run 'datapin auth login' or set OSF_TOKEN")
 		}
 
 		// Fail fast: JSON mode has no interactive prompt, so --yes is mandatory

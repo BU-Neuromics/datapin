@@ -10,13 +10,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/client"
 )
 
 // uniqueWikiPage returns a namespaced page name and registers cleanup that
 // deletes it after the test (best effort), so live runs leave no residue.
 func uniqueWikiPage(e *liveEnv) string {
-	page := fmt.Sprintf("gosf-ci-%d-%d", time.Now().UnixNano(), os.Getpid())
+	page := fmt.Sprintf("datapin-ci-%d-%d", time.Now().UnixNano(), os.Getpid())
 	e.t.Cleanup(func() {
 		e.runEventually("wiki", "rm", e.project+":"+page, "--yes", "--quiet")
 	})
@@ -25,7 +25,7 @@ func uniqueWikiPage(e *liveEnv) string {
 
 // TestLive_WikiCanonicalRoundTrip is the load-bearing live check on content
 // fidelity. OSF does NOT store wiki content byte-for-byte: it normalizes line
-// endings to LF and trims surrounding whitespace. gosf therefore guarantees a
+// endings to LF and trims surrounding whitespace. datapin therefore guarantees a
 // *canonical* round trip (client.CanonicalizeWikiContent), not a byte-exact one.
 // This pushes content with CRLF, interior trailing spaces, and a trailing
 // newline, then verifies OSF returns exactly the canonical form — and that a

@@ -6,8 +6,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/BU-Neuromics/gosf/internal/log"
-	"github.com/BU-Neuromics/gosf/internal/output"
+	"github.com/BU-Neuromics/datapin/internal/log"
+	"github.com/BU-Neuromics/datapin/internal/output"
 )
 
 var wikiOpenCmd = &cobra.Command{
@@ -17,8 +17,8 @@ var wikiOpenCmd = &cobra.Command{
 browser. On headless systems, prints the URL instead. The page defaults to "home".
 
 Examples:
-  gosf wiki open abc12                    # opens https://osf.io/abc12/wiki/home/
-  gosf wiki open "abc12:Analysis Notes"`,
+  datapin wiki open abc12                    # opens https://osf.io/abc12/wiki/home/
+  datapin wiki open "abc12:Analysis Notes"`,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {

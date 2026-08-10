@@ -1,15 +1,15 @@
-# gosf installer — Windows (PowerShell)
+# datapin installer — Windows (PowerShell)
 #
 # Usage (run in PowerShell):
-#   irm https://raw.githubusercontent.com/BU-Neuromics/gosf/main/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/BU-Neuromics/datapin/main/install.ps1 | iex
 #
 # Override install directory:
-#   $env:GOSF_INSTALL_DIR = "C:\tools"; irm ... | iex
+#   $env:DATAPIN_INSTALL_DIR = "C:\tools"; irm ... | iex
 
 $ErrorActionPreference = 'Stop'
 
-$Repo   = "BU-Neuromics/gosf"
-$Binary = "gosf"
+$Repo   = "BU-Neuromics/datapin"
+$Binary = "datapin"
 
 function Info { Write-Host "==> $args" -ForegroundColor Blue }
 function Ok   { Write-Host "  v $args" -ForegroundColor Green }
@@ -25,10 +25,10 @@ $Arch = switch ($env:PROCESSOR_ARCHITECTURE) {
 
 # ---- choose install directory ----
 
-$InstallDir = if ($env:GOSF_INSTALL_DIR) {
-  $env:GOSF_INSTALL_DIR
+$InstallDir = if ($env:DATAPIN_INSTALL_DIR) {
+  $env:DATAPIN_INSTALL_DIR
 } else {
-  Join-Path $env:LOCALAPPDATA "Programs\gosf"
+  Join-Path $env:LOCALAPPDATA "Programs\datapin"
 }
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 
@@ -43,7 +43,7 @@ $Ver     = $Version.TrimStart('v')
 
 $Archive  = "${Binary}_${Ver}_windows_${Arch}.zip"
 $BaseUrl  = "https://github.com/$Repo/releases/download/$Version"
-$Tmp      = Join-Path $env:TEMP "gosf-install-$(Get-Random)"
+$Tmp      = Join-Path $env:TEMP "datapin-install-$(Get-Random)"
 New-Item -ItemType Directory -Force -Path $Tmp | Out-Null
 
 try {

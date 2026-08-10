@@ -1,39 +1,55 @@
-# gosf — Go CLI for Open Science Framework
+# datapin — pin, sync, and publish research data
 
 ## Project overview
 
-`gosf` is a Go CLI replacing the stale Python `osfclient` package. Single-binary,
-distributed to researchers. CLI-only (no SDK/library scope).
+`datapin` is a single-binary Go CLI that keeps a project's data files
+verifiably in sync with remote storage via a committed manifest with git-like
+safety gates. It is the reboot of `gosf` (an OSF client) into a multi-backend
+FAIR data publication tool: workspace remotes (OSF today) keep the mutable
+push/pull/sync workflow; archive backends (Zenodo/InvenioRDM first) will add
+DOI-minting `publish`. Distributed to researchers; CLI-only (no SDK scope).
 
-**Module path:** `github.com/BU-Neuromics/gosf`
-**Binary name:** `gosf`
+Architecture and roadmap: [`docs/reboot-plan.md`](./docs/reboot-plan.md)
+(§2.4 Zenodo API, §4.1–4.7 architecture, §6 testing, §8 phases).
+Settled decisions D1–D10 — do not relitigate:
+[`docs/datapin-handoff.md`](./docs/datapin-handoff.md).
+
+**Module path:** `github.com/BU-Neuromics/datapin`
+**Binary name:** `datapin`
 **CLI framework:** Cobra + Viper
+**Releases:** restart at `v0.1.0` under the datapin name (gosf reached v2.1)
+
+Backward compatibility with gosf (kept until migration completes): a legacy
+`.gosf/gosf.toml` manifest is found and loaded **read-only** (`manifest.Save`
+refuses it with a migration hint), `~/.config/gosf` config/token stores are
+read when datapin's are absent (writes always target datapin paths), and
+`GOSF_*` env vars are accepted with a deprecation warning (`internal/env`).
 
 ## Command structure
 
 ```
-gosf ls       <project>[:<path>]
-gosf pull     <project>[:<path>] [dest]
-gosf push     <src> <project>:<path>
-gosf rm       <project>:<path>
-gosf versions <project>:<path>
-gosf projects
-gosf info     <project>
-gosf auth login
-gosf auth status
-gosf auth logout
-gosf open     <project>[:<path>]
-gosf add      <local-path> <project>:<remote-path>
-gosf status
-gosf sync
-gosf wiki ls       <project>
-gosf wiki get      <project>[:<page>] [dest]
-gosf wiki push     <src.md> <project>[:<page>]
-gosf wiki rm       <project>:<page>
-gosf wiki mv       <project>:<old> <new-name>
-gosf wiki versions <project>:<page>
-gosf wiki open     <project>[:<page>]
-gosf wiki add      <local.md> [<project>:]<page>
+datapin ls       <project>[:<path>]
+datapin pull     <project>[:<path>] [dest]
+datapin push     <src> <project>:<path>
+datapin rm       <project>:<path>
+datapin versions <project>:<path>
+datapin projects
+datapin info     <project>
+datapin auth login
+datapin auth status
+datapin auth logout
+datapin open     <project>[:<path>]
+datapin add      <local-path> <project>:<remote-path>
+datapin status
+datapin sync
+datapin wiki ls       <project>
+datapin wiki get      <project>[:<page>] [dest]
+datapin wiki push     <src.md> <project>[:<page>]
+datapin wiki rm       <project>:<page>
+datapin wiki mv       <project>:<old> <new-name>
+datapin wiki versions <project>:<page>
+datapin wiki open     <project>[:<page>]
+datapin wiki add      <local.md> [<project>:]<page>
 ```
 
 Wiki page addressing: `<project>:<page-name>`. The part after the colon is a
@@ -53,100 +69,44 @@ Priority order: `--token` flag > `OSF_TOKEN` env var > config file > OS keychain
 - Absent all: unauthenticated mode (public projects only), same code paths
 - Never echo token in logs or error output
 - Store via go-keyring; plaintext fallback in config for headless/HPC
-- Config file: `~/.config/gosf/config.toml`
+- Config file: `~/.config/datapin/config.toml`
 
-## OSF API — two-tier architecture
+## OSF API
 
-### Tier 1 — Metadata REST API (JSON:API spec)
-
-Base: `https://api.osf.io/v2`
-Auth header: `Authorization: Bearer <token>`
-
-Key endpoints:
-- `GET /nodes/{id}/` — project metadata
-- `GET /nodes/{id}/files/osfstorage/` — list files at root
-- `GET /nodes/{id}/files/osfstorage/?path=/subdir/` — list files in subdir
-- `GET /files/{file_id}/` — file metadata (includes download link)
-- `GET /files/{file_id}/versions/` — all versions, newest-first (no `embed=user`: the OSF versions endpoint has no embeddable user relationship and returns 400 if one is requested)
-
-### Tier 2 — Waterbutler (actual file bytes)
-
-Base: `https://files.osf.io`
-
-- Upload new file: `PUT https://files.osf.io/v1/resources/{node_id}/providers/osfstorage/?name={filename}`
-- Upload existing: PUT to the file's `upload` link from metadata API (creates a new version)
-- Download: follow the `download` link from file metadata response
-- Download specific version: append `?revision={n}` to the download URL (`client.RevisionURL`)
-
-Path resolution: walk Tier 1 tree to resolve a path string to a Waterbutler URL.
-This is the core complexity — isolated in `internal/resolver/path.go`.
-
-### Wikis (Tier 1 only — no Waterbutler)
-
-OSF project wikis are versioned markdown pages served entirely from the metadata
-API. `internal/client/wiki.go`:
-
-- `GET /nodes/{id}/wikis/` — list pages (paginated, `-modified` order) → `ListWikis`
-- `GET /wikis/{wiki_id}/content/` — **plain text** latest content → `GetWikiContent`
-- `GET /wikis/{wiki_id}/versions/` — versions (type `wiki-versions`, `id` = integer number) → `GetWikiVersions`
-- `GET /wikis/{wiki_id}/versions/{n}/content/` — plain text of a version → `GetWikiVersionContent`
-- `POST /nodes/{id}/wikis/` `{data:{type:"wikis",attributes:{name,content}}}` → `CreateWiki`
-- `POST /wikis/{wiki_id}/versions/` `{data:{type:"wiki-versions",attributes:{content}}}` → `CreateWikiVersion`
-- `PATCH /wikis/{wiki_id}/` (rename) → `RenameWiki`; `DELETE /wikis/{wiki_id}/` → `DeleteWiki`
-
-Notes:
-- **No server-side content hash.** Wiki versions expose only integer identifiers
-  + size, so gosf computes MD5s itself from fetched content (pages are KB-scale).
-- Page names: ≤100 chars, no `/`, non-blank, unique per node. The `home` page
-  cannot be renamed or deleted — gosf refuses both client-side (`isHomeWiki`).
-- Wiki addon can be disabled per node → `404 "The wiki for this node has been
-  disabled."`, recognized by `client.IsWikiDisabled` and mapped to an actionable
-  message by `friendlyWikiError`.
-- Registrations are read-only via this API (create → 405). Reads work anonymously
-  on public projects.
-- **Content is canonicalized, not byte-exact.** OSF normalizes wiki content on
-  write — CRLF→LF and surrounding whitespace trimmed (its DRF content field is
-  `trim_whitespace=True`) — so a byte-exact round trip is impossible. gosf hashes
-  and compares a **canonical form** (`client.CanonicalizeWikiContent`: CRLF/CR→LF,
-  `TrimSpace`) applied to *both* local and remote content, so idempotent pushes and
-  sync classification are stable regardless of OSF's exact rule. Wiki local MD5s use
-  `wikiLocalMD5`/`wikiContentMD5` (canonical), not the raw-bytes `computeLocalMD5`
-  used for storage files. `fakeosf` independently reproduces OSF's normalization
-  (`osfNormalizeContent`) so the hermetic tiers catch regressions; the live tier
-  asserts the canonical round trip + idempotency (`TestLive_WikiCanonicalRoundTrip`).
-- **Wiki content endpoints speak `text/markdown`, not JSON:API.** `GET
-  /wikis/{id}/content/` (and the per-version variant) are served by OSF's
-  `PlainTextRenderer`, so `getText` sends `Accept: text/markdown, */*` — sending the
-  JSON:API Accept (as the metadata calls do) returns 406 Not Acceptable.
+The OSF REST/Waterbutler specifics that used to live here moved to
+[`docs/osf-api.md`](./docs/osf-api.md). Architecture direction (backend
+adapter interface, workspace vs archive remotes, Zenodo/InvenioRDM) is in
+[`docs/reboot-plan.md`](./docs/reboot-plan.md); operational decisions in
+[`docs/datapin-handoff.md`](./docs/datapin-handoff.md).
 
 ## Project structure
 
 ```
-gosf/
+datapin/
 ├── cmd/
 │   ├── root.go              # root command, global flags, version
 │   ├── ls.go
 │   ├── pull.go              # --version=<n> flag for specific version download
 │   ├── push.go              # bare push selects by state; manifest update on push
 │   ├── rm.go
-│   ├── versions.go          # gosf versions <project>:<path>
+│   ├── versions.go          # datapin versions <project>:<path>
 │   ├── projects.go
 │   ├── info.go
 │   ├── auth.go
 │   ├── open.go
-│   ├── add.go               # gosf add — add entry to .gosf/gosf.toml
-│   ├── status.go            # gosf status — show manifest sync status
-│   ├── sync.go              # gosf sync — push/pull; processPushEntry/processPullEntry gates
-│   ├── onboard.go           # gosf onboard — guided setup (auth → project → pick files)
-│   ├── wiki.go              # gosf wiki command group + shared helpers (parseWikiTarget, findWikiPage, friendlyWikiError)
-│   ├── wiki_ls.go           # gosf wiki ls
-│   ├── wiki_get.go          # gosf wiki get (stdout/dest, --version)
-│   ├── wiki_versions.go     # gosf wiki versions
-│   ├── wiki_open.go         # gosf wiki open
-│   ├── wiki_push.go         # gosf wiki push (create/new-version, idempotent skip)
-│   ├── wiki_rm.go           # gosf wiki rm
-│   ├── wiki_mv.go           # gosf wiki mv (rename)
-│   ├── wiki_add.go          # gosf wiki add — [[wikis]] manifest entry
+│   ├── add.go               # datapin add — add entry to .datapin/datapin.toml
+│   ├── status.go            # datapin status — show manifest sync status
+│   ├── sync.go              # datapin sync — push/pull; processPushEntry/processPullEntry gates
+│   ├── onboard.go           # datapin onboard — guided setup (auth → project → pick files)
+│   ├── wiki.go              # datapin wiki command group + shared helpers (parseWikiTarget, findWikiPage, friendlyWikiError)
+│   ├── wiki_ls.go           # datapin wiki ls
+│   ├── wiki_get.go          # datapin wiki get (stdout/dest, --version)
+│   ├── wiki_versions.go     # datapin wiki versions
+│   ├── wiki_open.go         # datapin wiki open
+│   ├── wiki_push.go         # datapin wiki push (create/new-version, idempotent skip)
+│   ├── wiki_rm.go           # datapin wiki rm
+│   ├── wiki_mv.go           # datapin wiki mv (rename)
+│   ├── wiki_add.go          # datapin wiki add — [[wikis]] manifest entry
 │   ├── wiki_manifest.go     # fetchWikiRemoteState + wikiScanCache + canSkipWikiHistory (scan)
 │   ├── wiki_sync.go         # executeWikiEntry, wikiEntryPlan, atomic write
 │   ├── gate.go              # state-based safety: syncAction + sync/push/pullDecision, divergenceError, entryPlan
@@ -201,9 +161,9 @@ gosf/
 - **Update check** (`internal/update`): after each command, `update.MaybeNotify`
   prints a one-line "new release available" notice to stderr when the installed
   version is behind the latest GitHub release. Best-effort and cached — it hits
-  the releases API at most once/day (`~/.config/gosf/update_check.json`), uses a
+  the releases API at most once/day (`~/.config/datapin/update_check.json`), uses a
   short timeout, and never blocks. Gated off under `--quiet`, `--output=json`,
-  non-TTY stderr, a `dev` build, a Ctrl-C'd run, and when `GOSF_NO_UPDATE_CHECK`
+  non-TTY stderr, a `dev` build, a Ctrl-C'd run, and when `DATAPIN_NO_UPDATE_CHECK`
   is set. The gate (`shouldNotify`) and semver compare (`newerAvailable`) are
   pure/unit-tested; the checker's HTTP/cache/clock are injectable.
 - Colorized output (`fatih/color`). Indeterminate waits no longer use a spinner;
@@ -292,63 +252,7 @@ human confirmation lines on stdout (that text *is* the command's result).
 `ExecuteContext`. Commands use `cmd.Context()`, so Ctrl-C cancels in-flight
 HTTP requests and aborts transfers. A failed download removes its partial file.
 
-## OSF API notes
-
-### JSON:API response shapes
-
-Files list (`/nodes/{id}/files/osfstorage/`):
-```json
-{
-  "data": [
-    {
-      "id": "...",
-      "attributes": {
-        "name": "filename.csv",
-        "kind": "file",          // or "folder"
-        "size": 12345,
-        "date_modified": "...",
-        "materialized_path": "/data/results/file.csv"
-      },
-      "links": {
-        "download": "https://files.osf.io/...",
-        "upload": "https://files.osf.io/...",
-        "delete": "https://files.osf.io/..."
-      },
-      "relationships": {
-        "files": { "links": { "related": { "href": "..." } } }
-      }
-    }
-  ],
-  "links": { "next": "..." }
-}
-```
-
-Node metadata (`/nodes/{id}/`):
-```json
-{
-  "data": {
-    "id": "abc12",
-    "attributes": {
-      "title": "My Project",
-      "description": "...",
-      "date_created": "...",
-      "date_modified": "...",
-      "public": true
-    }
-  }
-}
-```
-
-### Pagination
-
-All list endpoints paginate. Check `links.next` and follow until null.
-
-### Component addressing
-
-`abc12/xyz34:/path` — `abc12` is the parent project GUID, `xyz34` is the
-component (child node) GUID. The path is resolved under `xyz34`.
-
-## Sync manifest (.gosf/gosf.toml)
+## Sync manifest (.datapin/datapin.toml)
 
 ### Schema
 
@@ -367,7 +271,7 @@ project = "xyz89"                 # optional per-entry override of [project].id
 **There is no `direction` field** (removed in #81, which finished #38). What a
 transfer should do is decided at the moment of the transfer from the L/B/R
 comparison; a standing per-entry default could only block transfers that were
-unambiguously safe. Manifests written by gosf ≤1.9 still carry the key: `Load`
+unambiguously safe. Manifests written by datapin ≤1.9 still carry the key: `Load`
 counts it via the pure `LegacyDirectionCount`, warns once, and ignores it, and
 `Save` drops it.
 
@@ -379,7 +283,7 @@ address a named wiki page instead of a storage path:
 local     = "docs/home.md"   # markdown file, relative to repo root
 page      = "home"           # wiki page name on OSF
 version   = 3                # pinned wiki version identifier; 0 = not yet pushed
-md5       = "…"              # MD5 of the pinned version's content, computed by gosf
+md5       = "…"              # MD5 of the pinned version's content, computed by datapin
 project   = "xyz89"          # optional per-entry override
 ```
 
@@ -395,7 +299,7 @@ via `WikiEntry.BaselineEntry()` (which exposes the pinned `version`+`md5` as an
 hashes fetched content: it fetches the latest once and skips older-version
 hashing when local matches latest or the pinned baseline (`canSkipWikiHistory`,
 the wiki analogue of `canSkipVersionHistory`), memoized per project by
-`wikiScanCache`. `gosf status`, `gosf sync`, and manifest-driven push/pull treat
+`wikiScanCache`. `datapin status`, `datapin sync`, and manifest-driven push/pull treat
 wiki entries as first-class rows; a wiki "transfer" is a metadata-API call
 (push = create page / new version; pull = atomic local file write via
 `writeFileAtomic`).
@@ -479,7 +383,7 @@ Classifying a manifest against the remote is the dominant cost of `sync`/`status
   call and synthesizes a latest-only `RemoteVersion`. The decision is the pure,
   unit-tested `canSkipVersionHistory`; `TestCanSkipVersionHistory_EquivalentToFullHistory`
   proves the synthetic slice classifies identically to the full history. The skip
-  requires `current_version > 0`; if OSF omits it, gosf falls back to fetching
+  requires `current_version > 0`; if OSF omits it, datapin falls back to fetching
   history (`TestLive_ListingCarriesCurrentVersion` guards the assumption).
 
 ### State-based safety (gate matrix)
@@ -537,17 +441,17 @@ same way, and why `sync`, `push`, and `pull` cannot drift apart.
 - `FileVersionAttributes` now includes `Extra.Hashes.MD5` from `attributes.extra.hashes.md5`.
 - `WaterbutlerClient.Upload` returns `(UploadResult, error)` — `UploadResult` carries `Version int` and `MD5 string` from the Waterbutler response.
 
-### `gosf add` (`cmd/add.go`)
+### `datapin add` (`cmd/add.go`)
 
 ```
-gosf add <local-path> <project>:<remote-path>
+datapin add <local-path> <project>:<remote-path>
 ```
-- Creates .gosf/gosf.toml if absent.
+- Creates .datapin/datapin.toml if absent.
 - Errors if local path already in manifest.
 - Fetches remote version+MD5 if file exists; writes version=0, md5="" otherwise.
 - Prints .gitignore tip for local files >50 MB.
 
-### `gosf status` (`cmd/status.go`)
+### `datapin status` (`cmd/status.go`)
 
 - Computes local MD5 for each entry.
 - Fetches remote versions unless `--no-check-remote` — **including for unpinned
@@ -558,7 +462,7 @@ gosf add <local-path> <project>:<remote-path>
   otherwise (CI-friendly). `PIN_ONLY` and `DIVERGED` count as not-in-sync.
 - `--output=json` emits array of `{path, kind, state, declared_version, remote_latest_version}`.
 
-### `gosf sync` (`cmd/sync.go`)
+### `datapin sync` (`cmd/sync.go`)
 
 Non-interactive. Three passes — `scanEntries`/`scanWikiEntries` classify all,
 `syncDecision` picks each entry's action, a divergence **pre-flight** fails hard
@@ -585,20 +489,20 @@ nothing, and requiring a flag for it was the bug in #81.
 Flags: `--force`, `--resolve=ours|theirs`, `--dry-run`, `--no-check-remote`,
 `--jobs`/`-j`.
 
-### `gosf push` manifest integration
+### `datapin push` manifest integration
 
-- **Bare `gosf push`** (manifest-driven) runs classify → pre-flight → confirm →
+- **Bare `datapin push`** (manifest-driven) runs classify → pre-flight → confirm →
   execute. A push that writes remote bytes (new file / new version) prints a rich
   per-file plan (header with project title + PUBLIC/PRIVATE and a loud warning when
   public, per-file `local → remote` + action + size + MD5, and a summary line) and
   prompts for confirmation on a TTY. `--yes`/`--force` bypass the prompt; in
-  `--output=json` mode `--force` is **mandatory** (same rule as `gosf rm`), and a
+  `--output=json` mode `--force` is **mandatory** (same rule as `datapin rm`), and a
   non-TTY run without `--yes`/`--force` refuses rather than hang.
   Bare push selects entries by state (`pushDecision`): AHEAD / NOT_PUSHED with
   local content / PIN_ONLY, plus REMOTE_NEWER and BEHIND under `--force` (a
   deliberate rollback). An entry whose local content is already on the remote
   carries no work to publish, so it is skipped rather than failing the run.
-- **Explicit `gosf push <src> <project>:<path>`** keeps the `--conflict`
+- **Explicit `datapin push <src> <project>:<path>`** keeps the `--conflict`
   behavior; it additionally skips an overwrite that would merely re-mint identical
   bytes.
 - After a successful push, `UploadResult.Version > 0` → update manifest atomically.
@@ -608,18 +512,18 @@ Flags: `--force`, `--resolve=ours|theirs`, `--dry-run`, `--no-check-remote`,
 `pull`/`ls`/`info`/`status`/`versions` attempt the fetch unauthenticated (empty
 token is a valid client) and only need a token for private data. A raw 401/403 on
 a read is wrapped by `friendlyAuthError` (`cmd/auth_helpers.go`) into an
-actionable "run 'gosf auth login' or set OSF_TOKEN" message. `push`/`sync`/
+actionable "run 'datapin auth login' or set OSF_TOKEN" message. `push`/`sync`/
 `projects` still require a token up front.
 
-### `gosf onboard` (`cmd/onboard.go`)
+### `datapin onboard` (`cmd/onboard.go`)
 
 Interactive, resumable guided setup (TTY-only; errors under `--output=json` or a
 non-TTY). Detects state and enters at the first unsatisfied phase: **auth**
-(offered, not required — `runLogin`, shared with `gosf auth login`) → **project**
+(offered, not required — `runLogin`, shared with `datapin auth login`) → **project**
 (attach a GUID: `--project`, a numbered pick from `client.GetUserNodes`, or typed)
 → **select** (candidates from `internal/gitutil.Candidates`, the bubbletea tree
 picker in `internal/picker`, remote base via `--remote-base`/prompt) → writes
-manifest entries and **stops**, pointing at `gosf sync`. Pure helpers
+manifest entries and **stops**, pointing at `datapin sync`. Pure helpers
 (`untrackedCandidates`, `remotePath`) and the tree model are unit-tested; the
 guard paths (non-TTY / `--output=json`) are integration-tested; and the full
 interactive flow is driven end-to-end over a **pseudo-terminal** in
@@ -637,7 +541,7 @@ All other errors are printed to stderr and exit 1. `rootCmd.SilenceErrors = true
 
 ## Development notes
 
-- Build: `go build -o gosf .`
+- Build: `go build -o datapin .`
 - Test: `go test ./...` (and `go test -race ./...`)
 - Format check: `gofmt -l .` (must print nothing)
 - Vet: `go vet ./...`
@@ -645,16 +549,16 @@ All other errors are printed to stderr and exit 1. `rootCmd.SilenceErrors = true
 
 ### Agent-skill parity (`cmd/skill_doc_test.go`)
 
-`skills/gosf/SKILL.md` is a **shipped artifact** — installed into coding agents
+`skills/datapin/SKILL.md` is a **shipped artifact** — installed into coding agents
 via skills.sh — and its frontmatter `description` is what decides whether the
 skill loads for a task at all. It has no compiler and drifted silently: the whole
-`gosf wiki` group shipped in v1.9.0 and went undocumented for two releases,
+`datapin wiki` group shipped in v1.9.0 and went undocumented for two releases,
 description included, so agents asked about an OSF wiki were never offered the
 skill.
 
 `cmd/skill_doc_test.go` walks the real cobra tree and asserts:
 
-1. every command path (`gosf wiki add`, …) appears in the skill body;
+1. every command path (`datapin wiki add`, …) appears in the skill body;
 2. every non-hidden flag, global and per-command, appears in the skill;
 3. every top-level command name appears in the frontmatter `description`.
 
@@ -672,7 +576,7 @@ update the skill in the same PR.
 3. **Live** (`-tags live`, `integration/live/`) — the built binary against a **real**
    private OSF project. Compiled only under `-tags live`; each test skips unless
    `OSF_TEST_TOKEN` + `OSF_TEST_PROJECT` (+ optional `OSF_TEST_COMPONENT`) are set.
-   Tests write under a unique `/gosf-ci-<nano>-<pid>/` folder and delete it on
+   Tests write under a unique `/datapin-ci-<nano>-<pid>/` folder and delete it on
    cleanup, so they are repeatable and leave no residue. Run privately:
    ```
    OSF_TEST_TOKEN=… OSF_TEST_PROJECT=… OSF_TEST_COMPONENT=… \
@@ -687,7 +591,7 @@ update the skill in the same PR.
 `make cover` reports **merged unit + integration** coverage. Integration/live tests
 drive the compiled binary as a subprocess, so plain `go test -cover` misses them
 (and undercounts `cmd`). The harness builds the binary with `-cover` and points it
-at `GOCOVERDIR` when `GOSF_COVERDIR` is set; `go tool covdata` then merges the
+at `GOCOVERDIR` when `DATAPIN_COVERDIR` is set; `go tool covdata` then merges the
 subprocess profiles with the unit `-coverprofile` into one number and
 `coverage/coverage.txt`. Real baseline: `cmd` ~75%, `internal/*` 84–98%.
 
@@ -777,7 +681,7 @@ logic *out* of those glue layers and into tested functions.
 
 ### Branching model
 
-All work happens on feature branches cut from `main`. One branch per logical
+All work happens on feature branches cut from `dev`. One branch per logical
 group of commands. Branch naming: `claude/<slug>`. Open a PR, get it merged,
 delete the branch, pull main, repeat.
 
@@ -861,7 +765,7 @@ Strip the `Authorization` header when following redirects to a different host.
 - Private project without auth → APIError 403
 
 **`projects`**
-- No token → 401, tell user to run `gosf auth login`
+- No token → 401, tell user to run `datapin auth login`
 - Paginate all pages before printing
 
 **`open`**
@@ -881,7 +785,7 @@ Strip the `Authorization` header when following redirects to a different host.
   transfers nothing (version + MD5 come from the version listing, the only source
   available with no local copy — `pullSession.pinFor`). Conflicts with
   `--no-track` and requires a path argument. Entries land as `MISSING`, so a
-  plain `gosf sync` fetches them; this is how remote files that nothing tracks
+  plain `datapin sync` fetches them; this is how remote files that nothing tracks
   become visible to `sync`, which only ever iterates manifest entries.
 
 **`push`**

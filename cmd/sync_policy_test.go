@@ -3,7 +3,7 @@ package cmd
 import (
 	"testing"
 
-	"github.com/BU-Neuromics/gosf/internal/manifest"
+	"github.com/BU-Neuromics/datapin/internal/manifest"
 )
 
 // syncDecision is the whole of sync's policy: every state has exactly one
@@ -52,7 +52,7 @@ func TestSyncDecision(t *testing.T) {
 	}
 }
 
-// Bare `gosf push` publishes local work. It selects the states where local
+// Bare `datapin push` publishes local work. It selects the states where local
 // holds something the remote does not, plus the deliberate rollback under
 // --force — never by a manifest field.
 func TestPushDecision(t *testing.T) {
@@ -92,7 +92,7 @@ func TestPushDecision(t *testing.T) {
 	}
 }
 
-// Bare `gosf pull` never uploads: it fetches the states where the remote holds
+// Bare `datapin pull` never uploads: it fetches the states where the remote holds
 // something local does not, and leaves local work alone unless forced.
 func TestPullDecision(t *testing.T) {
 	tests := []struct {

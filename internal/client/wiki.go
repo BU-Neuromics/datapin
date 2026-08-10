@@ -89,7 +89,7 @@ func (v WikiVersion) Contributor() string {
 // hashing and equality comparison. OSF does NOT store wiki content byte-for-byte:
 // it normalizes line endings to LF and trims surrounding whitespace (its DRF
 // content field is trim_whitespace=True, and CRLF is converted to LF on write).
-// gosf therefore cannot promise a byte-exact round trip; instead it compares a
+// datapin therefore cannot promise a byte-exact round trip; instead it compares a
 // canonical form so idempotent pushes and sync classification are stable. The
 // function is idempotent and is applied to BOTH local and remote content, so
 // agreement holds regardless of OSF's exact internal rule.

@@ -1,4 +1,4 @@
-// Package log is gosf's leveled activity logger. It writes human-readable,
+// Package log is datapin's leveled activity logger. It writes human-readable,
 // colorized log lines to stderr (keeping stdout reserved for machine/result
 // output) using the standard library's log/slog with a custom handler.
 //
@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/BU-Neuromics/gosf/internal/output"
+	"github.com/BU-Neuromics/datapin/internal/output"
 )
 
 func defaultNow() time.Time { return time.Now() }

@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+> **Rename notice (2026-08-10):** this project was rebooted from `gosf` to
+> **`datapin`** (see `docs/reboot-plan.md`). Versioning restarts at `v0.1.0`
+> under the datapin name; the `[1.x]`/`[2.x]` entries below record the tool's
+> previous life as gosf and are kept verbatim (their release links point at
+> the original gosf repository).
+
 ## [2.1.0] - 2026-07-31
 
 Rate-limit resilience. Projects with more than a handful of tracked files were

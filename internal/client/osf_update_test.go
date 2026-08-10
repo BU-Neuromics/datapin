@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/client"
 )
 
 func strPtr(s string) *string { return &s }
@@ -27,7 +27,7 @@ func TestUpdateNode_Title(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	t.Setenv("GOSF_API_BASE", srv.URL+"/v2")
+	t.Setenv("DATAPIN_API_BASE", srv.URL+"/v2")
 	c := client.New("tok")
 	node, err := c.UpdateNode(context.Background(), "abc12", client.UpdateNodeAttrs{
 		Title: strPtr("Updated Title"),
@@ -58,7 +58,7 @@ func TestUpdateNode_MultipleFields(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	t.Setenv("GOSF_API_BASE", srv.URL+"/v2")
+	t.Setenv("DATAPIN_API_BASE", srv.URL+"/v2")
 	c := client.New("tok")
 	_, err := c.UpdateNode(context.Background(), "abc12", client.UpdateNodeAttrs{
 		Title:       strPtr("T"),
@@ -98,7 +98,7 @@ func TestUpdateNode_404(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	t.Setenv("GOSF_API_BASE", srv.URL+"/v2")
+	t.Setenv("DATAPIN_API_BASE", srv.URL+"/v2")
 	c := client.New("tok")
 	_, err := c.UpdateNode(context.Background(), "notfound", client.UpdateNodeAttrs{Title: strPtr("x")})
 	if err == nil {

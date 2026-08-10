@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/client"
 )
 
 func TestFriendlyAuthError(t *testing.T) {
@@ -22,7 +22,7 @@ func TestFriendlyAuthError(t *testing.T) {
 				t.Fatal("expected wrapped error")
 			}
 			msg := err.Error()
-			if !strings.Contains(msg, "gosf auth login") || !strings.Contains(msg, "OSF_TOKEN") {
+			if !strings.Contains(msg, "datapin auth login") || !strings.Contains(msg, "OSF_TOKEN") {
 				t.Errorf("message should suggest authentication: %q", msg)
 			}
 		})

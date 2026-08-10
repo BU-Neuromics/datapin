@@ -3,7 +3,7 @@ package pathutil_test
 import (
 	"testing"
 
-	"github.com/BU-Neuromics/gosf/internal/pathutil"
+	"github.com/BU-Neuromics/datapin/internal/pathutil"
 )
 
 // ---- FileRemotePath (push/add single file) ----

@@ -6,10 +6,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
-	"github.com/BU-Neuromics/gosf/internal/config"
-	"github.com/BU-Neuromics/gosf/internal/log"
-	"github.com/BU-Neuromics/gosf/internal/output"
+	"github.com/BU-Neuromics/datapin/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/config"
+	"github.com/BU-Neuromics/datapin/internal/log"
+	"github.com/BU-Neuromics/datapin/internal/output"
 )
 
 var (
@@ -24,9 +24,9 @@ var wikiRmCmd = &cobra.Command{
 for confirmation unless --yes is supplied. The home page cannot be deleted.
 
 Examples:
-  gosf wiki rm abc12:scratch
-  gosf wiki rm abc12:scratch --yes
-  gosf wiki rm abc12:scratch --dry-run`,
+  datapin wiki rm abc12:scratch
+  datapin wiki rm abc12:scratch --yes
+  datapin wiki rm abc12:scratch --dry-run`,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -40,7 +40,7 @@ Examples:
 
 		token := config.LoadToken(flagToken)
 		if token == "" {
-			return fmt.Errorf("wiki rm requires authentication — run 'gosf auth login' or set OSF_TOKEN")
+			return fmt.Errorf("wiki rm requires authentication — run 'datapin auth login' or set OSF_TOKEN")
 		}
 
 		// JSON mode has no interactive prompt, so --yes is mandatory for a real

@@ -3,7 +3,7 @@ package cmd
 import (
 	"testing"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/client"
 )
 
 func TestParseWikiTarget(t *testing.T) {

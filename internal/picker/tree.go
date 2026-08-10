@@ -1,4 +1,4 @@
-// Package picker provides an interactive file-tree selector for gosf onboard:
+// Package picker provides an interactive file-tree selector for datapin onboard:
 // a pure, testable tree model (this file) and a thin bubbletea view over it.
 package picker
 
@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/BU-Neuromics/gosf/internal/gitutil"
+	"github.com/BU-Neuromics/datapin/internal/gitutil"
 )
 
 // CheckState is a node's checkbox state.

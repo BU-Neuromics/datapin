@@ -9,8 +9,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/BU-Neuromics/gosf/internal/gitutil"
-	"github.com/BU-Neuromics/gosf/internal/output"
+	"github.com/BU-Neuromics/datapin/internal/gitutil"
+	"github.com/BU-Neuromics/datapin/internal/output"
 )
 
 // ErrCanceled is returned by Run when the user quits without confirming.

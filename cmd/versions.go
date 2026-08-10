@@ -6,11 +6,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
-	"github.com/BU-Neuromics/gosf/internal/config"
-	"github.com/BU-Neuromics/gosf/internal/log"
-	"github.com/BU-Neuromics/gosf/internal/output"
-	"github.com/BU-Neuromics/gosf/internal/resolver"
+	"github.com/BU-Neuromics/datapin/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/config"
+	"github.com/BU-Neuromics/datapin/internal/log"
+	"github.com/BU-Neuromics/datapin/internal/output"
+	"github.com/BU-Neuromics/datapin/internal/resolver"
 )
 
 var versionsCmd = &cobra.Command{
@@ -21,8 +21,8 @@ var versionsCmd = &cobra.Command{
 Requires a specific file path (folders are not supported).
 
 Examples:
-  gosf versions abc12:/data/results.csv
-  gosf versions abc12:/data/results.csv --output=json`,
+  datapin versions abc12:/data/results.csv
+  datapin versions abc12:/data/results.csv --output=json`,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {

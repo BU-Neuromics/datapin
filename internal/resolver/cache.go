@@ -6,7 +6,7 @@ import (
 
 	"golang.org/x/sync/singleflight"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/client"
 )
 
 // cachingLister wraps a FileLister and memoizes directory listings for the

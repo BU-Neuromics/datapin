@@ -8,10 +8,10 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 
-	"github.com/BU-Neuromics/gosf/internal/log"
+	"github.com/BU-Neuromics/datapin/internal/log"
 )
 
-// Manifest is the in-memory representation of gosf.toml.
+// Manifest is the in-memory representation of datapin.toml.
 type Manifest struct {
 	Project ProjectConfig `toml:"project"`
 	Files   []Entry       `toml:"files"`
@@ -50,7 +50,7 @@ func (e Entry) ResolveProject(defaultID string) string {
 
 // WikiEntry describes one wiki page tracked by the manifest. It carries the
 // same pinned baseline as a file entry (version + md5), but the remote side is
-// a named wiki page rather than a storage path. The MD5 is computed by gosf
+// a named wiki page rather than a storage path. The MD5 is computed by datapin
 // from the page content (OSF exposes no content hash for wiki versions).
 type WikiEntry struct {
 	Local   string `toml:"local"`
@@ -75,11 +75,11 @@ func (w WikiEntry) BaselineEntry() Entry {
 	return Entry{Version: w.Version, MD5: w.MD5}
 }
 
-// NotFoundError is returned by FindManifest when no .gosf/gosf.toml is found.
+// NotFoundError is returned by FindManifest when no .datapin/datapin.toml is found.
 type NotFoundError struct{}
 
 func (NotFoundError) Error() string {
-	return ".gosf/gosf.toml not found in this directory or any parent"
+	return ".datapin/datapin.toml not found in this directory or any parent"
 }
 
 // IsNotFound reports whether err is a NotFoundError.
@@ -88,7 +88,7 @@ func IsNotFound(err error) bool {
 	return ok
 }
 
-// Load parses and validates gosf.toml at path.
+// Load parses and validates datapin.toml at path.
 func Load(path string) (*Manifest, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -102,7 +102,7 @@ func Load(path string) (*Manifest, error) {
 
 	if n := LegacyDirectionCount(data); n > 0 {
 		log.Warnf("%s: 'direction' is no longer used (%d entr%s) and will be dropped when the manifest is next written — "+
-			"gosf now decides each transfer from local/pinned/remote state; run 'gosf status' to see it",
+			"datapin now decides each transfer from local/pinned/remote state; run 'datapin status' to see it",
 			path, n, plural(n, "y", "ies"))
 	}
 
@@ -149,9 +149,21 @@ func plural(n int, one, many string) string {
 	return many
 }
 
+// IsLegacyPath reports whether path is a pre-rename .gosf/gosf.toml
+// manifest. Legacy manifests are accepted read-only for migration.
+func IsLegacyPath(path string) bool {
+	return filepath.Base(path) == "gosf.toml" &&
+		filepath.Base(filepath.Dir(path)) == ".gosf"
+}
+
 // Save writes the manifest to path atomically (temp file + rename).
 // The parent directory is created if it does not exist.
+// Legacy .gosf/gosf.toml manifests are read-only: Save refuses them with a
+// migration hint rather than perpetuating the pre-rename layout.
 func Save(m *Manifest, path string) error {
+	if IsLegacyPath(path) {
+		return fmt.Errorf("legacy manifest %s is read-only — migrate it first: mv .gosf .datapin && mv .datapin/gosf.toml .datapin/datapin.toml", path)
+	}
 	data, err := toml.Marshal(m)
 	if err != nil {
 		return fmt.Errorf("marshalling manifest: %w", err)
@@ -161,7 +173,7 @@ func Save(m *Manifest, path string) error {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("creating manifest directory: %w", err)
 	}
-	tmp, err := os.CreateTemp(dir, ".gosf.toml.tmp.*")
+	tmp, err := os.CreateTemp(dir, ".datapin.toml.tmp.*")
 	if err != nil {
 		return fmt.Errorf("creating temp file: %w", err)
 	}
@@ -185,7 +197,9 @@ func Save(m *Manifest, path string) error {
 }
 
 // FindManifest walks up from the current working directory until it finds
-// .gosf/gosf.toml. Returns (manifestPath, repoRoot, error).
+// .datapin/datapin.toml, or — for migration — a legacy .gosf/gosf.toml
+// (accepted read-only, with a warning; the new name wins when both exist
+// in the same directory). Returns (manifestPath, repoRoot, error).
 // Returns NotFoundError if none is found.
 func FindManifest() (string, string, error) {
 	dir, err := os.Getwd()
@@ -194,9 +208,14 @@ func FindManifest() (string, string, error) {
 	}
 
 	for {
-		candidate := filepath.Join(dir, ".gosf", "gosf.toml")
+		candidate := filepath.Join(dir, ".datapin", "datapin.toml")
 		if _, err := os.Stat(candidate); err == nil {
 			return candidate, dir, nil
+		}
+		legacy := filepath.Join(dir, ".gosf", "gosf.toml")
+		if _, err := os.Stat(legacy); err == nil {
+			log.Warnf("found legacy %s — it is read-only; migrate it: mv .gosf .datapin && mv .datapin/gosf.toml .datapin/datapin.toml", legacy)
+			return legacy, dir, nil
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
@@ -207,16 +226,16 @@ func FindManifest() (string, string, error) {
 	}
 }
 
-// Init creates or updates .gosf/gosf.toml in dir with the given project ID.
-// The .gosf/ subdirectory is created if it does not exist.
+// Init creates or updates .datapin/datapin.toml in dir with the given project ID.
+// The .datapin/ subdirectory is created if it does not exist.
 // If the file exists, [project].id is updated and all [[files]] entries are preserved.
 // created reports whether a new file was created.
 func Init(dir, projectID string) (path string, created bool, err error) {
-	gosfDir := filepath.Join(dir, ".gosf")
-	if mkErr := os.MkdirAll(gosfDir, 0755); mkErr != nil {
-		return "", false, fmt.Errorf("creating .gosf directory: %w", mkErr)
+	datapinDir := filepath.Join(dir, ".datapin")
+	if mkErr := os.MkdirAll(datapinDir, 0755); mkErr != nil {
+		return "", false, fmt.Errorf("creating .datapin directory: %w", mkErr)
 	}
-	path = filepath.Join(gosfDir, "gosf.toml")
+	path = filepath.Join(datapinDir, "datapin.toml")
 
 	var m Manifest
 	if _, statErr := os.Stat(path); os.IsNotExist(statErr) {

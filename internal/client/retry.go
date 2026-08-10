@@ -6,12 +6,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/BU-Neuromics/gosf/internal/log"
+	"github.com/BU-Neuromics/datapin/internal/log"
 )
 
 // OSF throttles: roughly 100 requests/hour unauthenticated and 10,000/day
 // authenticated. It signals a throttled request with 429 and a Retry-After
-// header, which gosf used to ignore outright — the request simply failed and
+// header, which datapin used to ignore outright — the request simply failed and
 // the run died mid-scan (issue #86).
 //
 // A bounded retry absorbs the brief throttles that a large scan provokes

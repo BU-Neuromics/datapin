@@ -9,9 +9,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/BU-Neuromics/gosf/internal/log"
-	"github.com/BU-Neuromics/gosf/internal/output"
-	"github.com/BU-Neuromics/gosf/internal/resolver"
+	"github.com/BU-Neuromics/datapin/internal/log"
+	"github.com/BU-Neuromics/datapin/internal/output"
+	"github.com/BU-Neuromics/datapin/internal/resolver"
 )
 
 var openCmd = &cobra.Command{
@@ -21,9 +21,9 @@ var openCmd = &cobra.Command{
 the default browser. On headless systems, prints the URL instead.
 
 Examples:
-  gosf open abc12                  # opens https://osf.io/abc12/
-  gosf open abc12:/data            # opens the /data folder in the OSF web UI
-  gosf open abc12:/data/file.csv   # opens the file in the OSF web UI`,
+  datapin open abc12                  # opens https://osf.io/abc12/
+  datapin open abc12:/data            # opens the /data folder in the OSF web UI
+  datapin open abc12:/data/file.csv   # opens the file in the OSF web UI`,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {

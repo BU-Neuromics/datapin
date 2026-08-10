@@ -6,10 +6,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
-	"github.com/BU-Neuromics/gosf/internal/config"
-	"github.com/BU-Neuromics/gosf/internal/log"
-	"github.com/BU-Neuromics/gosf/internal/output"
+	"github.com/BU-Neuromics/datapin/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/config"
+	"github.com/BU-Neuromics/datapin/internal/log"
+	"github.com/BU-Neuromics/datapin/internal/output"
 )
 
 var wikiVersionsCmd = &cobra.Command{
@@ -18,8 +18,8 @@ var wikiVersionsCmd = &cobra.Command{
 	Long: `List all versions of a wiki page, newest first.
 
 Examples:
-  gosf wiki versions abc12:home
-  gosf wiki versions abc12:home --output=json`,
+  datapin wiki versions abc12:home
+  datapin wiki versions abc12:home --output=json`,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {

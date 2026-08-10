@@ -9,12 +9,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
-	"github.com/BU-Neuromics/gosf/internal/config"
-	"github.com/BU-Neuromics/gosf/internal/log"
-	"github.com/BU-Neuromics/gosf/internal/manifest"
-	"github.com/BU-Neuromics/gosf/internal/output"
-	"github.com/BU-Neuromics/gosf/internal/resolver"
+	"github.com/BU-Neuromics/datapin/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/config"
+	"github.com/BU-Neuromics/datapin/internal/log"
+	"github.com/BU-Neuromics/datapin/internal/manifest"
+	"github.com/BU-Neuromics/datapin/internal/output"
+	"github.com/BU-Neuromics/datapin/internal/resolver"
 )
 
 var (
@@ -33,21 +33,21 @@ var pullCmd = &cobra.Command{
 	Long: `Download files from an OSF project to a local destination.
 
 With no arguments, downloads every tracked file that is missing locally or behind
-the remote, from .gosf/gosf.toml. Locally modified files are reported and left
-alone unless --force is given. Requires .gosf/gosf.toml with [project].id set
-(run 'gosf init').
+the remote, from .datapin/datapin.toml. Locally modified files are reported and left
+alone unless --force is given. Requires .datapin/datapin.toml with [project].id set
+(run 'datapin init').
 
 With a path argument, downloads the specified file or folder and records it
-in .gosf/gosf.toml (unless --no-track is set). --track-only registers the files
+in .datapin/datapin.toml (unless --no-track is set). --track-only registers the files
 without transferring any bytes, so a large remote can be adopted and reviewed
-before it is downloaded; a plain 'gosf sync' then fetches them.
+before it is downloaded; a plain 'datapin sync' then fetches them.
 
 Path rules follow scp conventions:
-  gosf pull abc12:/data/file.csv             → ./data/file.csv
-  gosf pull abc12:/data/file.csv out.csv     → ./out.csv
-  gosf pull abc12:/data/dir/ local/          → ./local/<files>
-  gosf pull abc12:/data/dir  local/          → ./local/dir/<files>
-  gosf pull abc12:                           → download entire project`,
+  datapin pull abc12:/data/file.csv             → ./data/file.csv
+  datapin pull abc12:/data/file.csv out.csv     → ./out.csv
+  datapin pull abc12:/data/dir/ local/          → ./local/<files>
+  datapin pull abc12:/data/dir  local/          → ./local/dir/<files>
+  datapin pull abc12:                           → download entire project`,
 	Args:         cobra.RangeArgs(0, 2),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -58,7 +58,7 @@ Path rules follow scp conventions:
 			return fmt.Errorf("--track-only and --no-track are contradictory: one records entries without downloading, the other downloads without recording")
 		}
 		if pullTrackOnly && len(args) == 0 {
-			return fmt.Errorf("--track-only needs a remote path to register, e.g. gosf pull abc12:/data/ --track-only")
+			return fmt.Errorf("--track-only needs a remote path to register, e.g. datapin pull abc12:/data/ --track-only")
 		}
 		token := config.LoadToken(flagToken)
 		osfClient := client.New(token)
@@ -78,7 +78,7 @@ Path rules follow scp conventions:
 func runBarePull(ctx context.Context, osfClient *client.OSFClient, wb *client.WaterbutlerClient, token string) error {
 	manifestPath, repoRoot, err := manifest.FindManifest()
 	if manifest.IsNotFound(err) {
-		return fmt.Errorf("no .gosf/gosf.toml found — run: gosf init <project-id>")
+		return fmt.Errorf("no .datapin/datapin.toml found — run: datapin init <project-id>")
 	}
 	if err != nil {
 		return err
@@ -89,7 +89,7 @@ func runBarePull(ctx context.Context, osfClient *client.OSFClient, wb *client.Wa
 		return err
 	}
 	if m.Project.ID == "" {
-		return fmt.Errorf("no project configured — run: gosf init <project-id>")
+		return fmt.Errorf("no project configured — run: datapin init <project-id>")
 	}
 
 	// Per-run cache so the many files sharing directories don't each re-list them.
@@ -173,7 +173,7 @@ func runExplicitPull(cmd *cobra.Command, args []string, osfClient *client.OSFCli
 		}
 	}
 
-	// Load .gosf/gosf.toml if present for duplicate-tracking check and auto-tracking.
+	// Load .datapin/datapin.toml if present for duplicate-tracking check and auto-tracking.
 	var m *manifest.Manifest
 	var manifestPath string
 	manifestCreated := false
@@ -187,12 +187,12 @@ func runExplicitPull(cmd *cobra.Command, args []string, osfClient *client.OSFCli
 		return findErr
 	}
 
-	// If no .gosf/gosf.toml and tracking enabled, we'll create one.
+	// If no .datapin/datapin.toml and tracking enabled, we'll create one.
 	if m == nil && !pullNoTrack {
 		if target.NodeID == "" {
-			return fmt.Errorf("no project configured — run: gosf init <project-id>")
+			return fmt.Errorf("no project configured — run: datapin init <project-id>")
 		}
-		manifestPath = filepath.Join(".gosf", "gosf.toml")
+		manifestPath = filepath.Join(".datapin", "datapin.toml")
 		m = &manifest.Manifest{Project: manifest.ProjectConfig{ID: target.NodeID}}
 		manifestCreated = true
 	}
@@ -245,7 +245,7 @@ func runExplicitPull(cmd *cobra.Command, args []string, osfClient *client.OSFCli
 			}
 		}
 		if err := manifest.Save(s.manifest, s.manifestPath); err != nil {
-			return fmt.Errorf("updating .gosf/gosf.toml: %w", err)
+			return fmt.Errorf("updating .datapin/datapin.toml: %w", err)
 		}
 		_ = manifestCreated
 	}
@@ -255,7 +255,7 @@ func runExplicitPull(cmd *cobra.Command, args []string, osfClient *client.OSFCli
 	}
 	switch {
 	case s.trackOnly:
-		log.Infof("registered %d file(s) in %s — run 'gosf sync' to download them", len(s.tracked), s.manifestPath)
+		log.Infof("registered %d file(s) in %s — run 'datapin sync' to download them", len(s.tracked), s.manifestPath)
 	case len(s.result.Downloaded) == 0:
 		log.Infof("nothing to download (no files at that path)")
 	}
@@ -336,7 +336,7 @@ func (s *pullSession) file(item client.FileItem, destPath string) error {
 	case s.trackOnly:
 		// Register the file without moving any bytes: the point is to make a
 		// large remote visible in the manifest so it can be reviewed (and then
-		// fetched by a plain `gosf sync`) rather than downloaded blind.
+		// fetched by a plain `datapin sync`) rather than downloaded blind.
 		log.Infof("+ tracked %s (not downloaded)", destPath)
 
 	// Idempotent skip: if the destination already holds byte-identical content
@@ -444,14 +444,14 @@ func validateVersion(versions []client.FileVersion, n int) error {
 	if len(versions) == 0 {
 		return fmt.Errorf("no versions found for this file")
 	}
-	return fmt.Errorf("version %d not found; run 'gosf versions <path>' to see available versions", n)
+	return fmt.Errorf("version %d not found; run 'datapin versions <path>' to see available versions", n)
 }
 
 func init() {
 	pullCmd.Flags().BoolVar(&pullDryRun, "dry-run", false, "Show what would be downloaded without downloading")
 	pullCmd.Flags().IntVar(&pullVersion, "version", 0, "Download a specific version number (0 = latest)")
-	pullCmd.Flags().BoolVar(&pullNoTrack, "no-track", false, "Download without recording in .gosf/gosf.toml")
-	pullCmd.Flags().BoolVar(&pullTrackOnly, "track-only", false, "Record entries in .gosf/gosf.toml without downloading anything")
+	pullCmd.Flags().BoolVar(&pullNoTrack, "no-track", false, "Download without recording in .datapin/datapin.toml")
+	pullCmd.Flags().BoolVar(&pullTrackOnly, "track-only", false, "Record entries in .datapin/datapin.toml without downloading anything")
 	pullCmd.Flags().BoolVar(&pullForce, "force", false, "Overwrite locally-modified files with the pinned version")
 	pullCmd.Flags().StringVar(&pullResolve, "resolve", "", "Resolve divergence by taking remote: 'theirs'")
 	pullCmd.Flags().IntVarP(&pullJobs, "jobs", "j", defaultScanJobs, "Number of files to scan against the remote concurrently")

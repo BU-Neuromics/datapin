@@ -3,7 +3,7 @@ package cmd
 import (
 	"testing"
 
-	"github.com/BU-Neuromics/gosf/internal/manifest"
+	"github.com/BU-Neuromics/datapin/internal/manifest"
 )
 
 func TestStateDisplay_NewStates(t *testing.T) {

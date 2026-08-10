@@ -1,4 +1,4 @@
-module github.com/BU-Neuromics/gosf
+module github.com/BU-Neuromics/datapin
 
 go 1.24.7
 

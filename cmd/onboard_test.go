@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/BU-Neuromics/gosf/internal/gitutil"
-	"github.com/BU-Neuromics/gosf/internal/manifest"
+	"github.com/BU-Neuromics/datapin/internal/gitutil"
+	"github.com/BU-Neuromics/datapin/internal/manifest"
 )
 
 func TestRemotePath(t *testing.T) {

@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
-	"github.com/BU-Neuromics/gosf/internal/manifest"
-	"github.com/BU-Neuromics/gosf/internal/testutil/fakeosf"
+	"github.com/BU-Neuromics/datapin/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/manifest"
+	"github.com/BU-Neuromics/datapin/internal/testutil/fakeosf"
 )
 
 // wikiPlanFor builds the classified plan executeWikiEntry consumes.
@@ -71,7 +71,7 @@ func wikiSyncEnv(t *testing.T) (*fakeosf.Server, *client.OSFClient, string) {
 	t.Helper()
 	srv := fakeosf.New()
 	t.Cleanup(srv.Close)
-	t.Setenv("GOSF_API_BASE", srv.URL()+"/v2")
+	t.Setenv("DATAPIN_API_BASE", srv.URL()+"/v2")
 	dir := t.TempDir()
 	return srv, client.New("tok"), dir
 }

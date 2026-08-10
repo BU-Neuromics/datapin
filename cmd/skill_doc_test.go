@@ -10,10 +10,10 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// The agent skill (skills/gosf/SKILL.md) is a shipped artifact: it is installed
+// The agent skill (skills/datapin/SKILL.md) is a shipped artifact: it is installed
 // into coding agents via skills.sh, and its frontmatter `description` is what
 // decides whether the skill loads for a given task at all. Nothing in CI used to
-// compare it against the CLI, and it drifted silently — the entire `gosf wiki`
+// compare it against the CLI, and it drifted silently — the entire `datapin wiki`
 // command group shipped in v1.9.0 and went undocumented for two releases,
 // including in the description, so agents asked to work on an OSF wiki were
 // never offered the skill in the first place.
@@ -23,7 +23,7 @@ import (
 // deliberate omission below.
 
 // skillPath locates the skill relative to this package.
-func skillPath() string { return filepath.Join("..", "skills", "gosf", "SKILL.md") }
+func skillPath() string { return filepath.Join("..", "skills", "datapin", "SKILL.md") }
 
 func readSkill(t *testing.T) string {
 	t.Helper()
@@ -76,7 +76,7 @@ func TestSkill_DocumentsEveryCommand(t *testing.T) {
 	skill := readSkill(t)
 
 	walkCommands(rootCmd, func(c *cobra.Command) {
-		path := c.CommandPath() // e.g. "gosf wiki add"
+		path := c.CommandPath() // e.g. "datapin wiki add"
 		if reason, excused := undocumentedCommands[path]; excused {
 			t.Logf("%s is deliberately undocumented: %s", path, reason)
 			return

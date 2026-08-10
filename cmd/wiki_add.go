@@ -7,27 +7,27 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
-	"github.com/BU-Neuromics/gosf/internal/config"
-	"github.com/BU-Neuromics/gosf/internal/log"
-	"github.com/BU-Neuromics/gosf/internal/manifest"
-	"github.com/BU-Neuromics/gosf/internal/output"
+	"github.com/BU-Neuromics/datapin/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/config"
+	"github.com/BU-Neuromics/datapin/internal/log"
+	"github.com/BU-Neuromics/datapin/internal/manifest"
+	"github.com/BU-Neuromics/datapin/internal/output"
 )
 
 var wikiAddCmd = &cobra.Command{
 	Use:   "add <local.md> [<project>:]<page>",
-	Short: "Track a local markdown file as a wiki page in .gosf/gosf.toml",
+	Short: "Track a local markdown file as a wiki page in .datapin/datapin.toml",
 	Long: `Add a local markdown file to the manifest as a wiki page, so it syncs with
-'gosf status' and 'gosf sync' like a tracked file.
+'datapin status' and 'datapin sync' like a tracked file.
 
 If <page> is omitted the page name is derived from the file name. If the page
 already exists on OSF, its current version and content MD5 are pinned;
 otherwise the entry starts unpinned (version 0).
 
 Examples:
-  gosf wiki add docs/home.md home
-  gosf wiki add docs/home.md abc12:home
-  gosf wiki add "docs/Analysis Notes.md"     # page "Analysis Notes"`,
+  datapin wiki add docs/home.md home
+  datapin wiki add docs/home.md abc12:home
+  datapin wiki add "docs/Analysis Notes.md"     # page "Analysis Notes"`,
 	Args:         cobra.RangeArgs(1, 2),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -54,9 +54,9 @@ Examples:
 		manifestCreated := false
 		if manifest.IsNotFound(findErr) {
 			if nodeID == "" {
-				return fmt.Errorf("no project configured — run: gosf init <project-id>")
+				return fmt.Errorf("no project configured — run: datapin init <project-id>")
 			}
-			manifestPath = filepath.Join(".gosf", "gosf.toml")
+			manifestPath = filepath.Join(".datapin", "datapin.toml")
 			m = &manifest.Manifest{Project: manifest.ProjectConfig{ID: nodeID}}
 			manifestCreated = true
 		} else if findErr != nil {
@@ -73,7 +73,7 @@ Examples:
 			nodeID = m.Project.ID
 		}
 		if nodeID == "" {
-			return fmt.Errorf("no project configured — run: gosf init <project-id>")
+			return fmt.Errorf("no project configured — run: datapin init <project-id>")
 		}
 		entryProject := ""
 		if nodeID != m.Project.ID {
@@ -81,7 +81,7 @@ Examples:
 		}
 
 		if findWikiEntryByLocal(m, src) >= 0 || findEntryByLocal(m, src) >= 0 {
-			return fmt.Errorf("entry with local path %q already exists in .gosf/gosf.toml", src)
+			return fmt.Errorf("entry with local path %q already exists in .datapin/datapin.toml", src)
 		}
 
 		entry := manifest.WikiEntry{

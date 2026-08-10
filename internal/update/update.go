@@ -1,4 +1,4 @@
-// Package update implements a cached, best-effort "a newer gosf release is
+// Package update implements a cached, best-effort "a newer datapin release is
 // available" check. It never blocks a command meaningfully (short timeout,
 // network hit at most once per day) and stays silent on any error.
 package update
@@ -10,6 +10,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+
+	"github.com/BU-Neuromics/datapin/internal/env"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -17,13 +19,13 @@ import (
 
 	"golang.org/x/term"
 
-	"github.com/BU-Neuromics/gosf/internal/config"
-	"github.com/BU-Neuromics/gosf/internal/output"
+	"github.com/BU-Neuromics/datapin/internal/config"
+	"github.com/BU-Neuromics/datapin/internal/output"
 )
 
 const (
-	defaultAPIURL = "https://api.github.com/repos/BU-Neuromics/gosf/releases/latest"
-	releasesURL   = "https://github.com/BU-Neuromics/gosf/releases/latest"
+	defaultAPIURL = "https://api.github.com/repos/BU-Neuromics/datapin/releases/latest"
+	releasesURL   = "https://github.com/BU-Neuromics/datapin/releases/latest"
 	checkInterval = 24 * time.Hour
 	httpTimeout   = 1500 * time.Millisecond
 )
@@ -50,7 +52,7 @@ func (c *Checker) Notify(ctx context.Context, w io.Writer) {
 		return
 	}
 	fmt.Fprintln(w, output.Yellow(fmt.Sprintf(
-		"\nA new gosf release is available: %s (you have %s)", latest, c.Current)))
+		"\nA new datapin release is available: %s (you have %s)", latest, c.Current)))
 	fmt.Fprintf(w, "  %s\n", releasesURL)
 }
 
@@ -73,7 +75,7 @@ func (c *Checker) cachedOrFetch(ctx context.Context) string {
 // MaybeNotify is the CLI entry point: it gates on the environment and, when
 // appropriate, runs the cached check writing to stderr. Called once per command.
 func MaybeNotify(current string, quiet, jsonMode bool) {
-	disabled := os.Getenv("GOSF_NO_UPDATE_CHECK") != ""
+	disabled := env.Get("NO_UPDATE_CHECK") != ""
 	stderrTTY := term.IsTerminal(int(os.Stderr.Fd()))
 	if !shouldNotify(current, quiet, jsonMode, stderrTTY, disabled) {
 		return

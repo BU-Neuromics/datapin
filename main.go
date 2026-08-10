@@ -1,6 +1,6 @@
 package main
 
-import "github.com/BU-Neuromics/gosf/cmd"
+import "github.com/BU-Neuromics/datapin/cmd"
 
 func main() {
 	cmd.Execute()

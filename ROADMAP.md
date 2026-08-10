@@ -1,42 +1,19 @@
 # Roadmap
 
-This roadmap covers planned content-management features for agents. The scope
-is deliberately limited to _content_ operations (files, metadata, wiki). User
-management, permissions, and project administration are out of scope.
+datapin is the reboot of gosf as a general-purpose FAIR data publication
+tool. The authoritative roadmap is the phased plan in
+[`docs/reboot-plan.md` §8](./docs/reboot-plan.md#8-phased-roadmap):
 
-## v1.1 — File operations and node metadata — Released (v1.1.0)
+| Phase | Scope |
+|-------|-------|
+| 0 | Zenodo sandbox spike — verify API behaviors, seed `fakeinvenio` fixtures (`docs/zenodo-notes.md`) |
+| 1 | Backend adapter interface (workspace/archive roles), OSF workspace adapter carried over, InvenioRDM/Zenodo archive driver, manifest v2, `publish` |
+| 2 | Metadata model + `check` linter, SPDX/ORCID/ROR validation, reserve-DOI, `export` (datapackage.json, RO-Crate) |
+| 3 | Static site generator (goldmark), dataset landing pages, gh-pages deploy, `migrate` wiki import |
+| 4 | Figshare adapter, cross-adapter contract suite, `check --fair` (F-UJI) |
+| 5 | S3/SFTP workspace backends, Dataverse, generic InvenioRDM, embargo, Cloudflare Pages |
 
-**Status:** ✅ Released 2026-06-05 ([`v1.1.0`](https://github.com/BU-Neuromics/gosf/releases/tag/v1.1.0)). All four commands below are shipped.
-
-Builds on infrastructure already in place (Waterbutler client, OSF metadata
-client) with minimal new API surface.
-
-| Command | Description |
-|---------|-------------|
-| `gosf mv <src> <dest>` | Rename or move a file or folder within OSF Storage |
-| `gosf cp <src> <dest>` | Copy a file or folder (across projects supported) |
-| `gosf mkdir <project>:<path>` | Create a folder in OSF Storage |
-| `gosf set <project> [flags]` | Update node title, description, category, or tags |
-
-`gosf mv` updates `gosf.toml` automatically if the moved path has a manifest
-entry.
-
-`gosf set` flags: `--title`, `--description`, `--category`, `--tags`.
-
-## v1.2 — Wiki and components
-
-New API surface (node write path, wiki endpoints); deserves its own release
-and test coverage.
-
-| Command | Description |
-|---------|-------------|
-| `gosf wiki ls <project>` | List wiki pages |
-| `gosf wiki get <project> <page>` | Print wiki page content |
-| `gosf wiki set <project> <page>` | Create or update a wiki page (`--file` or `--message`) |
-| `gosf mkproject [parent] --title <t>` | Create a top-level project, or a sub-component when a parent GUID is given |
-
-## Later / under consideration
-
-- CEDAR / custom file metadata (`/cedar_metadata_records/`)
-- Comments (`POST /nodes/{id}/comments/`)
-- `gosf status --remote-newer` CI mode (fail only on REMOTE_NEWER)
+Operational decisions (settled) are recorded in
+[`docs/datapin-handoff.md`](./docs/datapin-handoff.md). The pre-rename gosf
+roadmap (v1.x/v2.x OSF content operations, all shipped) is preserved in this
+file's git history.

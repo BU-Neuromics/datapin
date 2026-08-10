@@ -9,9 +9,9 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
-	"github.com/BU-Neuromics/gosf/internal/config"
-	"github.com/BU-Neuromics/gosf/internal/log"
+	"github.com/BU-Neuromics/datapin/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/config"
+	"github.com/BU-Neuromics/datapin/internal/log"
 )
 
 var authCmd = &cobra.Command{
@@ -39,7 +39,7 @@ On headless/HPC systems, use --no-keychain to write to a token file instead.`,
 }
 
 // runLogin reads a token (interactively or from stdin), validates it against the
-// API, and stores it. Shared by `gosf auth login` and `gosf onboard`.
+// API, and stores it. Shared by `datapin auth login` and `datapin onboard`.
 func runLogin(ctx context.Context, noKeychain bool) error {
 	token, err := readToken()
 	if err != nil {
@@ -105,7 +105,7 @@ var authStatusCmd = &cobra.Command{
 		user, err := c.GetCurrentUser(cmd.Context())
 		if err != nil {
 			if apiErr, ok := err.(*client.APIError); ok && apiErr.StatusCode == 401 {
-				return fmt.Errorf("stored token is invalid; run 'gosf auth login' to re-authenticate")
+				return fmt.Errorf("stored token is invalid; run 'datapin auth login' to re-authenticate")
 			}
 			return fmt.Errorf("checking auth: %w", err)
 		}

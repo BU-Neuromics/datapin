@@ -12,12 +12,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
-	"github.com/BU-Neuromics/gosf/internal/config"
-	"github.com/BU-Neuromics/gosf/internal/gitutil"
-	"github.com/BU-Neuromics/gosf/internal/manifest"
-	"github.com/BU-Neuromics/gosf/internal/output"
-	"github.com/BU-Neuromics/gosf/internal/picker"
+	"github.com/BU-Neuromics/datapin/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/config"
+	"github.com/BU-Neuromics/datapin/internal/gitutil"
+	"github.com/BU-Neuromics/datapin/internal/manifest"
+	"github.com/BU-Neuromics/datapin/internal/output"
+	"github.com/BU-Neuromics/datapin/internal/picker"
 )
 
 var (
@@ -28,15 +28,15 @@ var (
 var onboardCmd = &cobra.Command{
 	Use:   "onboard",
 	Short: "Guided setup: attach a project and pick local files to push",
-	Long: `Walk through gosf setup interactively: authenticate, attach an OSF
+	Long: `Walk through datapin setup interactively: authenticate, attach an OSF
 project, and pick the local files (things git doesn't track) to push.
 
 onboard is resumable — it detects the current state and starts at the right
 step, so it's safe to re-run as you add more files. It stops after recording
-your selections in .gosf/gosf.toml; run 'gosf sync' to push.
+your selections in .datapin/datapin.toml; run 'datapin sync' to push.
 
-Requires an interactive terminal. For scripting, use 'gosf init', 'gosf add',
-and 'gosf sync' directly.`,
+Requires an interactive terminal. For scripting, use 'datapin init', 'datapin add',
+and 'datapin sync' directly.`,
 	Args:         cobra.NoArgs,
 	SilenceUsage: true,
 	RunE:         runOnboard,
@@ -44,10 +44,10 @@ and 'gosf sync' directly.`,
 
 func runOnboard(cmd *cobra.Command, args []string) error {
 	if flagOutput == "json" {
-		return errors.New("onboard is interactive and unavailable with --output=json; use gosf init / add / sync")
+		return errors.New("onboard is interactive and unavailable with --output=json; use datapin init / add / sync")
 	}
 	if !isInteractive() {
-		return errors.New("onboard needs an interactive terminal; use gosf init / add / sync for scripting")
+		return errors.New("onboard needs an interactive terminal; use datapin init / add / sync for scripting")
 	}
 	ctx := cmd.Context()
 
@@ -61,7 +61,7 @@ func runOnboard(cmd *cobra.Command, args []string) error {
 			}
 			token = config.LoadToken(flagToken)
 		} else {
-			fmt.Fprintln(os.Stderr, output.Dim("Continuing unauthenticated — enter a GUID manually; log in before 'gosf sync'."))
+			fmt.Fprintln(os.Stderr, output.Dim("Continuing unauthenticated — enter a GUID manually; log in before 'datapin sync'."))
 		}
 	} else {
 		fmt.Fprintln(os.Stderr, output.Green("✓")+" authenticated")
@@ -206,8 +206,8 @@ func chooseProject(ctx context.Context, c *client.OSFClient, token string) (stri
 func onboardSummary(mfPath string) error {
 	fmt.Fprintln(os.Stderr, output.Bold("\nNext steps"))
 	fmt.Fprintf(os.Stderr, "  review:  %s\n", mfPath)
-	fmt.Fprintln(os.Stderr, "  status:  gosf status")
-	fmt.Fprintln(os.Stderr, "  push:    gosf sync")
+	fmt.Fprintln(os.Stderr, "  status:  datapin status")
+	fmt.Fprintln(os.Stderr, "  push:    datapin sync")
 	return nil
 }
 

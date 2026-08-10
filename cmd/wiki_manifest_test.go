@@ -7,9 +7,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
-	"github.com/BU-Neuromics/gosf/internal/manifest"
-	"github.com/BU-Neuromics/gosf/internal/testutil/fakeosf"
+	"github.com/BU-Neuromics/datapin/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/manifest"
+	"github.com/BU-Neuromics/datapin/internal/testutil/fakeosf"
 )
 
 func md5of(s string) string {
@@ -34,7 +34,7 @@ func newWikiScanFixture(t *testing.T) (*fakeosf.Server, *client.OSFClient) {
 	t.Helper()
 	srv := fakeosf.New()
 	t.Cleanup(srv.Close)
-	t.Setenv("GOSF_API_BASE", srv.URL()+"/v2")
+	t.Setenv("DATAPIN_API_BASE", srv.URL()+"/v2")
 	return srv, client.New("")
 }
 
