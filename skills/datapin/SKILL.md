@@ -1,15 +1,18 @@
 ---
 name: datapin
-description: "Use when working with the Open Science Framework (OSF) for research data management. Invoke when: the project contains a .datapin/datapin.toml manifest; the user mentions OSF, osf.io, or osfclient; the task involves syncing, pushing, or pulling research data files with an OSF project; the task involves an OSF project wiki or its markdown pages; or you need to inspect, manage, or automate files stored in OSF Storage. Covers the full datapin CLI: manifest management (datapin init / add / status / sync), file transfer (datapin pull / push / rm), storage management (datapin mkdir / mv / cp), project navigation (datapin ls / info / projects / versions / open / set), project wikis (datapin wiki ls / get / push / rm / mv / versions / open / add), and authentication (datapin auth)."
+description: "Use when working with the Open Science Framework (OSF) for research data management. Invoke when: the project contains a .datapin/datapin.toml manifest (or a legacy .gosf/gosf.toml from datapin's previous life as gosf); the user mentions OSF, osf.io, or osfclient; the task involves syncing, pushing, or pulling research data files with an OSF project; the task involves an OSF project wiki or its markdown pages; or you need to inspect, manage, or automate files stored in OSF Storage. Covers the full datapin CLI: manifest management (datapin init / add / status / sync), file transfer (datapin pull / push / rm), storage management (datapin mkdir / mv / cp), project navigation (datapin ls / info / projects / versions / open / set), project wikis (datapin wiki ls / get / push / rm / mv / versions / open / add), and authentication (datapin auth)."
 metadata:
-  version: "2.0.0"
+  version: "0.1.0"
 ---
 
 # datapin — Open Science Framework CLI
 
-`datapin` is a single-binary CLI for pushing, pulling, and syncing files with
-the [Open Science Framework](https://osf.io) (OSF). It replaces the
-unmaintained Python `osfclient`.
+`datapin` is a single-binary CLI that pins, syncs, and (soon) publishes
+research data. Today it syncs files with the
+[Open Science Framework](https://osf.io) (OSF); it began life as `gosf`, a
+replacement for the unmaintained Python `osfclient`, and legacy `.gosf`
+manifests, `~/.config/gosf` tokens, and `GOSF_*` env vars are still read
+(read-only, with deprecation warnings).
 
 ## Installation
 

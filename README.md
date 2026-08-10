@@ -3,10 +3,19 @@
 [![CI](https://github.com/BU-Neuromics/datapin/actions/workflows/ci.yml/badge.svg)](https://github.com/BU-Neuromics/datapin/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/BU-Neuromics/datapin)](https://github.com/BU-Neuromics/datapin/releases)
 
-`datapin` is a fast, single-binary command-line tool for pushing and pulling files
-to and from the [Open Science Framework](https://osf.io) (OSF). It is a
-maintained replacement for the Python `osfclient`, distributed as a static
-binary with no runtime dependencies.
+**Pin, sync, and publish research data.** `datapin` is a fast, single-binary
+CLI that keeps a project's data files verifiably in sync with remote storage
+through a committed manifest with git-like safety gates: run your analysis on
+the cluster, `datapin push` the results, `git clone` the repo anywhere, and
+`datapin pull` reproduces them — every file pinned to an exact version and
+MD5.
+
+Today datapin syncs against the
+[Open Science Framework](https://osf.io) (OSF) — it began life as `gosf`, a
+maintained replacement for the Python `osfclient`. It is growing into a
+general-purpose **FAIR data publication tool**: the same manifest-driven
+workflow, with archival, DOI-minting backends (Zenodo first) and generated
+dataset landing pages. See [Where datapin is going](#where-datapin-is-going).
 
 ```console
 $ datapin pull abc12:/data/results.csv
@@ -35,6 +44,39 @@ $ datapin wiki push docs/home.md abc12:home
   with `datapin sync`; CI-friendly status with `datapin status`.
 - **Project wikis** — read, write, and sync a project's versioned markdown wiki
   pages (`datapin wiki`), including manifest-driven sync of local `.md` files.
+
+## Where datapin is going
+
+datapin is the reboot of [`gosf`](https://github.com/BU-Neuromics/gosf) as a
+multi-backend FAIR data publication tool. The plan, in short:
+
+- **Workspace remotes** (OSF today; S3-compatible and SFTP later) keep the
+  current mutable push/pull/sync workflow for intermediate results — no DOIs,
+  no metadata ceremony.
+- **Archive backends** (Zenodo/InvenioRDM first, then Figshare and Dataverse)
+  add `datapin publish`: promote a pinned dataset to an immutable, versioned,
+  DOI-carrying record with DataCite-complete metadata.
+- **A generated static site** replaces the OSF wiki: citation-ready dataset
+  landing pages with checksums, version history, and schema.org JSON-LD,
+  deployed to GitHub Pages.
+
+The full architecture and phased roadmap live in
+[`docs/reboot-plan.md`](./docs/reboot-plan.md); operational decisions are in
+[`docs/datapin-handoff.md`](./docs/datapin-handoff.md). Releases restart at
+`v0.1.0` under the datapin name (gosf's history is preserved in this repo).
+
+### Migrating from gosf
+
+Existing gosf setups keep working: a legacy `.gosf/gosf.toml` manifest is
+found and read automatically (read-only — rename it to
+`.datapin/datapin.toml` to write), `~/.config/gosf` config/tokens are read
+when the datapin ones are absent, and `GOSF_*` environment variables are
+accepted with a deprecation warning. To migrate a repo:
+
+```console
+$ mv .gosf .datapin && mv .datapin/gosf.toml .datapin/datapin.toml
+$ datapin auth login   # re-store your token under datapin
+```
 
 ## For coding agents
 
