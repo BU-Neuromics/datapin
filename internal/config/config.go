@@ -9,11 +9,17 @@ import (
 
 	"github.com/spf13/viper"
 	"github.com/zalando/go-keyring"
+
+	"github.com/BU-Neuromics/datapin/internal/log"
 )
 
 const (
 	keychainService = "datapin"
 	keychainUser    = "token"
+
+	// legacyKeychainService is the pre-rename service name; entries stored
+	// by gosf are still read (and removed on logout) for migration.
+	legacyKeychainService = "gosf"
 )
 
 // ConfigDir returns the datapin config directory path (~/.config/datapin).
@@ -23,6 +29,16 @@ func ConfigDir() (string, error) {
 		return "", err
 	}
 	return filepath.Join(dir, "datapin"), nil
+}
+
+// legacyConfigDir returns the pre-rename config directory (~/.config/gosf),
+// which is read (never written) for migration.
+func legacyConfigDir() (string, error) {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "gosf"), nil
 }
 
 func configFilePath() (string, error) {
@@ -57,6 +73,11 @@ func InitViper() error {
 	viper.SetConfigName("config")
 	viper.SetConfigType("toml")
 	viper.AddConfigPath(dir)
+	// Read-only migration fallback: a pre-rename ~/.config/gosf/config.toml
+	// is still honored when no datapin config exists (earlier paths win).
+	if legacyDir, lerr := legacyConfigDir(); lerr == nil {
+		viper.AddConfigPath(legacyDir)
+	}
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			return fmt.Errorf("reading config: %w", err)
@@ -67,6 +88,8 @@ func InitViper() error {
 
 // LoadToken returns the token using the priority chain:
 // flagToken > OSF_TOKEN env > token file > OS keychain.
+// Within the file and keychain tiers the datapin store wins, falling back to
+// the pre-rename gosf store (read-only, with a migration warning).
 // Returns empty string if none found (unauthenticated mode).
 func LoadToken(flagToken string) string {
 	if flagToken != "" {
@@ -78,8 +101,15 @@ func LoadToken(flagToken string) string {
 	if t := readTokenFromFile(); t != "" {
 		return t
 	}
-	t, err := keyring.Get(keychainService, keychainUser)
-	if err == nil {
+	if t := readLegacyTokenFromFile(); t != "" {
+		log.Warnf("using token from legacy ~/.config/gosf/token — run 'datapin auth login' to migrate it")
+		return t
+	}
+	if t, err := keyring.Get(keychainService, keychainUser); err == nil {
+		return t
+	}
+	if t, err := keyring.Get(legacyKeychainService, keychainUser); err == nil {
+		log.Warnf("using token from the legacy gosf keychain entry — run 'datapin auth login' to migrate it")
 		return t
 	}
 	return ""
@@ -107,6 +137,11 @@ func DeleteToken() (warning string, err error) {
 	if kerr := keyring.Delete(keychainService, keychainUser); kerr != nil && kerr != keyring.ErrNotFound {
 		warning = fmt.Sprintf("could not remove token from OS keychain: %v", kerr)
 	}
+	// Also clear the pre-rename gosf stores: a legacy token left behind would
+	// keep authenticating runs after an apparently successful logout.
+	if kerr := keyring.Delete(legacyKeychainService, keychainUser); kerr != nil && kerr != keyring.ErrNotFound && warning == "" {
+		warning = fmt.Sprintf("could not remove token from OS keychain: %v", kerr)
+	}
 
 	p, perr := tokenFilePath()
 	if perr != nil {
@@ -114,6 +149,12 @@ func DeleteToken() (warning string, err error) {
 	}
 	if rmErr := os.Remove(p); rmErr != nil && !errors.Is(rmErr, os.ErrNotExist) {
 		return warning, fmt.Errorf("removing token file: %w", rmErr)
+	}
+	if legacyDir, lerr := legacyConfigDir(); lerr == nil {
+		legacyToken := filepath.Join(legacyDir, "token")
+		if rmErr := os.Remove(legacyToken); rmErr != nil && !errors.Is(rmErr, os.ErrNotExist) {
+			return warning, fmt.Errorf("removing legacy token file: %w", rmErr)
+		}
 	}
 	return warning, nil
 }
@@ -137,6 +178,20 @@ func readTokenFromFile() string {
 	if err != nil {
 		return ""
 	}
+	return readTokenFile(p)
+}
+
+// readLegacyTokenFromFile reads the token from the pre-rename
+// ~/.config/gosf/token (read-only migration fallback).
+func readLegacyTokenFromFile() string {
+	dir, err := legacyConfigDir()
+	if err != nil {
+		return ""
+	}
+	return readTokenFile(filepath.Join(dir, "token"))
+}
+
+func readTokenFile(p string) string {
 	data, err := os.ReadFile(p)
 	if err != nil {
 		return ""
@@ -156,8 +211,14 @@ func TokenSource(flagToken string) string {
 	if readTokenFromFile() != "" {
 		return "token file"
 	}
+	if readLegacyTokenFromFile() != "" {
+		return "legacy gosf token file"
+	}
 	if _, err := keyring.Get(keychainService, keychainUser); err == nil {
 		return "OS keychain"
+	}
+	if _, err := keyring.Get(legacyKeychainService, keychainUser); err == nil {
+		return "legacy gosf OS keychain entry"
 	}
 	return ""
 }

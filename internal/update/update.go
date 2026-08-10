@@ -10,6 +10,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+
+	"github.com/BU-Neuromics/datapin/internal/env"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -73,7 +75,7 @@ func (c *Checker) cachedOrFetch(ctx context.Context) string {
 // MaybeNotify is the CLI entry point: it gates on the environment and, when
 // appropriate, runs the cached check writing to stderr. Called once per command.
 func MaybeNotify(current string, quiet, jsonMode bool) {
-	disabled := os.Getenv("DATAPIN_NO_UPDATE_CHECK") != ""
+	disabled := env.Get("NO_UPDATE_CHECK") != ""
 	stderrTTY := term.IsTerminal(int(os.Stderr.Fd()))
 	if !shouldNotify(current, quiet, jsonMode, stderrTTY, disabled) {
 		return

@@ -149,9 +149,21 @@ func plural(n int, one, many string) string {
 	return many
 }
 
+// IsLegacyPath reports whether path is a pre-rename .gosf/gosf.toml
+// manifest. Legacy manifests are accepted read-only for migration.
+func IsLegacyPath(path string) bool {
+	return filepath.Base(path) == "gosf.toml" &&
+		filepath.Base(filepath.Dir(path)) == ".gosf"
+}
+
 // Save writes the manifest to path atomically (temp file + rename).
 // The parent directory is created if it does not exist.
+// Legacy .gosf/gosf.toml manifests are read-only: Save refuses them with a
+// migration hint rather than perpetuating the pre-rename layout.
 func Save(m *Manifest, path string) error {
+	if IsLegacyPath(path) {
+		return fmt.Errorf("legacy manifest %s is read-only — migrate it first: mv .gosf .datapin && mv .datapin/gosf.toml .datapin/datapin.toml", path)
+	}
 	data, err := toml.Marshal(m)
 	if err != nil {
 		return fmt.Errorf("marshalling manifest: %w", err)
@@ -185,7 +197,9 @@ func Save(m *Manifest, path string) error {
 }
 
 // FindManifest walks up from the current working directory until it finds
-// .datapin/datapin.toml. Returns (manifestPath, repoRoot, error).
+// .datapin/datapin.toml, or — for migration — a legacy .gosf/gosf.toml
+// (accepted read-only, with a warning; the new name wins when both exist
+// in the same directory). Returns (manifestPath, repoRoot, error).
 // Returns NotFoundError if none is found.
 func FindManifest() (string, string, error) {
 	dir, err := os.Getwd()
@@ -197,6 +211,11 @@ func FindManifest() (string, string, error) {
 		candidate := filepath.Join(dir, ".datapin", "datapin.toml")
 		if _, err := os.Stat(candidate); err == nil {
 			return candidate, dir, nil
+		}
+		legacy := filepath.Join(dir, ".gosf", "gosf.toml")
+		if _, err := os.Stat(legacy); err == nil {
+			log.Warnf("found legacy %s — it is read-only; migrate it: mv .gosf .datapin && mv .datapin/gosf.toml .datapin/datapin.toml", legacy)
+			return legacy, dir, nil
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
