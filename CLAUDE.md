@@ -2,21 +2,41 @@
 
 ## Project overview
 
-`datapin` is a single-binary Go CLI that keeps a project's data files
-verifiably in sync with remote storage via a committed manifest with git-like
-safety gates. It is the reboot of `gosf` (an OSF client) into a multi-backend
-FAIR data publication tool. Backend matrix (all shipped): archive backends
-(Zenodo/any InvenioRDM, Figshare, Dataverse) behind one `backend.Backend`
-interface with DOI-minting `publish`; workspace remotes (OSF via the legacy
-[[files]] flow, plus dir/S3/SFTP with journal-versioned dataset sync) for
-mutable, DOI-free intermediate results. Distributed to researchers;
-CLI-only (no SDK scope). Released: v0.1.0 (core+Zenodo+site), v0.2.0
-(Figshare/Dataverse/workspaces).
+`datapin` is a single-binary Go CLI for **FAIR research-data publication**:
+group files into a dataset in a committed manifest and `publish` it to an
+archive repository as an immutable, versioned, DOI-carrying record — or sync
+the same dataset to a mutable workspace remote when it is not ready for a DOI.
+Every file is pinned to an exact version + checksum, and the pin is the
+contract: any layer that can contradict it must fail loudly.
+
+Two remote roles, one manifest (kind implies role — D33):
+
+- **Archive remotes** (`invenio` = Zenodo/any InvenioRDM, `figshare`,
+  `dataverse`) behind one `backend.Backend` interface, with DOI-minting
+  `publish`, metadata linting, standard exports, citations, and generated
+  landing pages. **This is the primary surface** and where new work goes.
+- **Workspace remotes** (`dir`, `s3`, `sftp`) with journal-versioned dataset
+  sync for mutable, DOI-free intermediate results (the cluster→laptop loop).
+
+Distributed to researchers; CLI-only (no SDK scope). Released: v0.1.0
+(core+Zenodo+site), v0.2.0 (Figshare/Dataverse/workspaces).
+
+**OSF is legacy and frozen.** datapin is the reboot of `gosf`, an OSF client,
+and the OSF surface (`[[files]]`/`[[wikis]]`, `internal/client`,
+`internal/resolver`, the whole `wiki` group, the L/B/R gate machinery in
+`status`/`sync`/explicit `push`/`pull`) still ships and is still tested — but
+OSF is sunsetting its projects service, that code receives **no new
+investment**, and it is removed at the next major (#31) together with
+`migrate` and the gosf back-compat shims. `datapin migrate` is the exit ramp.
+When touching a shared code path, do not grow the OSF side; when writing
+user-facing docs, lead with archive/workspace and mark OSF as legacy.
 
 Architecture and roadmap: [`docs/reboot-plan.md`](./docs/reboot-plan.md)
-(§2.4 Zenodo API, §4.1–4.7 architecture, §6 testing, §8 phases).
+(§2.4 Zenodo API, §4.1–4.7 architecture, §6 testing, §8 phases); release
+ladder to v1.0 in [`ROADMAP.md`](./ROADMAP.md) and issue #40.
 Settled decisions D1–D10 — do not relitigate:
-[`docs/datapin-handoff.md`](./docs/datapin-handoff.md).
+[`docs/datapin-handoff.md`](./docs/datapin-handoff.md); D11–D53 in
+[`docs/decisions.md`](./docs/decisions.md).
 
 **Module path:** `github.com/BU-Neuromics/datapin`
 **Binary name:** `datapin`
@@ -31,7 +51,33 @@ read when datapin's are absent (writes always target datapin paths), and
 
 ## Command structure
 
+Archive + workspace (the primary surface). A bare argument with no `:` is a
+**dataset slug**, dispatched before the OSF `project:path` parse:
+
 ```
+datapin remote add <url> --name <n> [--kind invenio|figshare|dataverse|dir|s3|sftp]
+datapin remote ls
+datapin remote rm <name>
+datapin onboard                      # publish wizard (--osf = legacy flow)
+datapin publish  [<slug>]            # → DOI
+datapin check    [<slug>] [--fair]
+datapin export   <slug>
+datapin cite     <slug>
+datapin versions <slug>              # archive version chain
+datapin versions <slug>/<key>        # workspace journal for one file
+datapin pull     <slug> [--latest|--workspace]
+datapin open     <slug>              # archive landing page
+datapin push     <slug>              # → workspace remote (journaled)
+datapin revert   <slug>/<key> --to <n>
+datapin gc       [--keep N]
+datapin site     build|preview|publish
+datapin status                       # dataset rows + OSF file/wiki rows
+```
+
+Legacy OSF surface (frozen; removed at the next major — #31):
+
+```
+datapin migrate  [<osf-guid>] [dest]     # the exit ramp
 datapin ls       <project>[:<path>]
 datapin pull     <project>[:<path>] [dest]
 datapin push     <src> <project>:<path>
@@ -44,9 +90,12 @@ datapin auth status
 datapin auth logout
 datapin open     <project>[:<path>]
 datapin add      <local-path> <project>:<remote-path>
-datapin status
+datapin init     <project-id>
+datapin mkdir    <project>:<path>
+datapin mv       <src> <dest>
+datapin cp       <src> <dest>
+datapin set      <project>
 datapin sync
-datapin migrate  [<osf-guid>] [dest]
 datapin wiki ls       <project>
 datapin wiki get      <project>[:<page>] [dest]
 datapin wiki push     <src.md> <project>[:<page>]
@@ -69,14 +118,25 @@ Path convention: `abc12:/data/results/file.csv`
 
 ## Auth design
 
-Priority order: `--token` flag > `OSF_TOKEN` env var > config file > OS keychain
+Two independent ladders — do not conflate them:
+
+**Per-remote tokens** (archive + workspace, the primary surface):
+`DATAPIN_TOKEN_<NAME>` env var > OS keychain > `~/.config/datapin/tokens/<name>`.
+Never written to `config.toml` (which stays safe to commit). The `s3` kind
+reuses the token slot as `ACCESSKEY:SECRETKEY` (D34), falling back to
+`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`; `sftp` uses
+`SSH_AUTH_SOCK` > `~/.ssh/id_ed25519`/`id_rsa` > `DATAPIN_SFTP_PASSWORD` with
+`known_hosts` verification.
+
+**The OSF token** (legacy): `--token` flag > `OSF_TOKEN` env var > token file
+(`~/.config/datapin/token`) > OS keychain.
 
 - Absent all: unauthenticated mode (public projects only), same code paths
 - Never echo token in logs or error output
-- Store via go-keyring; plaintext fallback in config for headless/HPC
-- Config file: `~/.config/datapin/config.toml`
+- Store via go-keyring; plaintext file fallback for headless/HPC
+- Config file: `~/.config/datapin/config.toml` (remotes; never tokens)
 
-## OSF API
+## OSF API (legacy)
 
 The OSF REST/Waterbutler specifics that used to live here moved to
 [`docs/osf-api.md`](./docs/osf-api.md). Architecture direction (backend
@@ -86,8 +146,8 @@ adapter interface, workspace vs archive remotes, Zenodo/InvenioRDM) is in
 
 ## Archive publication (datasets → Zenodo/InvenioRDM)
 
-The FAIR-publication side added in the reboot (plan §4; decisions D11–D37
-in `docs/decisions.md`). OSF workspace sync above is untouched (D12).
+The FAIR-publication side added in the reboot (plan §4; decisions D11–D53
+in `docs/decisions.md`). The legacy OSF sync surface above is untouched (D12).
 
 **Packages:**
 
@@ -380,7 +440,14 @@ human confirmation lines on stdout (that text *is* the command's result).
 `ExecuteContext`. Commands use `cmd.Context()`, so Ctrl-C cancels in-flight
 HTTP requests and aborts transfers. A failed download removes its partial file.
 
-## Sync manifest (.datapin/datapin.toml)
+## Sync manifest — the legacy OSF sections (`[[files]]`/`[[wikis]]`)
+
+Everything from here to "Anonymous reads" describes the **frozen OSF surface**:
+schema-1 `[[files]]`/`[[wikis]]` entries, the L/B/R state machine, the gate
+matrix, and the OSF-specific rate-limit/scan optimizations. Datasets
+(`[[datasets]]`, schema 2) do not use any of it — their status states live in
+`cmd/dataset_status.go` and their transfer safety in the publish transaction and
+the pull pin gate (D41). Keep the two apart; do not grow the OSF side.
 
 ### Schema
 

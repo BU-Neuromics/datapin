@@ -29,8 +29,18 @@ var (
 
 var pullCmd = &cobra.Command{
 	Use:   "pull [<project>:<path>] [dest]",
-	Short: "Download files from an OSF project",
-	Long: `Download files from an OSF project to a local destination.
+	Short: "Download a dataset's files, or files from an OSF project",
+	Long: `Download data to a local destination.
+
+A bare argument naming a manifest dataset pulls that dataset:
+  datapin pull counts               the pinned published version, checksum-verified
+  datapin pull counts --latest      the archive's latest version, re-pinning to it
+  datapin pull counts --workspace   the current bytes on its workspace remote
+A pinned pull fails hard if the archive's checksum contradicts the manifest pin
+rather than delivering different bytes; --latest is how you move the pin.
+
+The remaining forms address the legacy OSF surface (frozen — see
+'datapin migrate').
 
 With no arguments, downloads every tracked file that is missing locally or behind
 the remote, from .datapin/datapin.toml. Locally modified files are reported and left

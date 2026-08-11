@@ -55,14 +55,18 @@ func addArchiveRemote(ctx context.Context, r config.Remote, token string, verify
 
 var remoteCmd = &cobra.Command{
 	Use:   "remote",
-	Short: "Manage archive backend remotes (Zenodo/InvenioRDM)",
-	Long: `Configure named archive remotes that datasets publish to.
+	Short: "Manage the archive and workspace remotes datasets use",
+	Long: `Configure named remotes that datasets publish or sync to.
 
-A remote is a backend instance (e.g. https://zenodo.org or
-https://sandbox.zenodo.org) stored in ~/.config/datapin/config.toml.
-Tokens are stored separately per remote — in the OS keychain, or a
-token file on headless systems — never in config.toml. The token
-lookup order is: DATAPIN_TOKEN_<NAME> env var, keychain, token file.`,
+The kind implies the role:
+  invenio, figshare, dataverse   archive remotes — publishing mints a DOI
+  dir, s3, sftp                  workspace remotes — journal-versioned, no DOI
+
+A remote is a backend instance (e.g. https://zenodo.org,
+https://sandbox.zenodo.org, s3://minio.lab:9000/bucket) stored in
+~/.config/datapin/config.toml. Tokens are stored separately per remote — in
+the OS keychain, or a token file on headless systems — never in config.toml.
+The token lookup order is: DATAPIN_TOKEN_<NAME> env var, keychain, token file.`,
 }
 
 var (
@@ -74,19 +78,32 @@ var (
 
 var remoteAddCmd = &cobra.Command{
 	Use:   "add <url>",
-	Short: "Add a named archive remote",
+	Short: "Add a named archive or workspace remote",
 	Long: `Register a backend instance as a named remote.
 
-The URL is probed to verify it answers like an InvenioRDM instance
-(--no-verify skips the probe, e.g. when offline). Pass --token to store
-an API token for the remote at the same time; tokens can also be
-supplied per-run via the DATAPIN_TOKEN_<NAME> environment variable.
+The URL is probed before the remote is added — an archive kind must answer
+like that API, a workspace kind must be listable (--no-verify skips the
+probe, e.g. when offline). Pass --token-value to store the remote's
+credential at the same time; it can also be supplied per-run via the
+DATAPIN_TOKEN_<NAME> environment variable.
 
-Zenodo sandbox and production are separate services with separate
-accounts and tokens — register them as two remotes:
+Archive kinds mint DOIs when a dataset publishes:
 
   datapin remote add https://sandbox.zenodo.org --name sandbox
-  datapin remote add https://zenodo.org --name zenodo`,
+  datapin remote add https://zenodo.org --name zenodo
+  datapin remote add https://demo.dataverse.org/dataverse/mylab --name dv --kind dataverse
+  datapin remote add https://api.figshare.com --name fig --kind figshare
+
+Zenodo sandbox and production are separate services with separate accounts
+and tokens — register them as two remotes and rehearse on the sandbox.
+
+Workspace kinds sync mutable intermediate results with journal versioning
+and no DOI:
+
+  datapin remote add /mnt/lab-share --name nas --kind dir
+  datapin remote add s3://minio.lab:9000/bucket/prefix --name obj --kind s3 \
+      --token-value ACCESSKEY:SECRETKEY
+  datapin remote add sftp://user@cluster/scratch/proj --name hpc --kind sftp`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		url := args[0]
@@ -237,9 +254,9 @@ func envSuffix(name string) string {
 
 func init() {
 	remoteAddCmd.Flags().StringVar(&remoteAddName, "name", "", "Name for the remote (required)")
-	remoteAddCmd.Flags().StringVar(&remoteAddKind, "kind", "invenio", "Backend kind (invenio, figshare, dataverse)")
+	remoteAddCmd.Flags().StringVar(&remoteAddKind, "kind", "invenio", "Remote kind: archive (invenio, figshare, dataverse) or workspace (dir, s3, sftp)")
 	remoteAddCmd.Flags().BoolVar(&remoteAddNoVerify, "no-verify", false, "Skip probing the URL before adding")
-	remoteAddCmd.Flags().StringVar(&remoteAddToken, "token-value", "", "API token to store for this remote")
+	remoteAddCmd.Flags().StringVar(&remoteAddToken, "token-value", "", "Credential to store for this remote (s3: ACCESSKEY:SECRETKEY)")
 	remoteAddCmd.Flags().BoolVar(&noKeychain, "no-keychain", false, "Store the token in a file instead of the OS keychain")
 	remoteCmd.AddCommand(remoteAddCmd, remoteLsCmd, remoteRmCmd)
 	rootCmd.AddCommand(remoteCmd)

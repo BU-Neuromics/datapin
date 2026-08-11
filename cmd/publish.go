@@ -26,7 +26,8 @@ var publishCmd = &cobra.Command{
 	Use:   "publish [<slug>]",
 	Short: "Publish a dataset to its archive remote, minting a DOI",
 	Long: `Promote a dataset's current files to a published, immutable,
-DOI-carrying record on its archive remote (Zenodo/InvenioRDM).
+DOI-carrying record on its archive remote (Zenodo or any InvenioRDM
+instance, Dataverse, or Figshare).
 
 Publishing is PERMANENT and PUBLIC: a published version cannot be edited
 or deleted, and its DOI resolves forever. Rehearse against a sandbox
@@ -40,7 +41,14 @@ stable and always resolves to the latest version.
 With no slug, every dataset with publishable changes is processed.
 --reserve uploads everything and reserves the DOI but does NOT publish —
 the DOI can go into a manuscript before the data is final; run publish
-again (without --reserve) to make it live.`,
+again (without --reserve) to make it live.
+
+A license is REQUIRED here (an SPDX id in [datasets.metadata]) and is
+always your explicit choice: 'datapin check' only warns about a missing
+one, but publish refuses, because a licenseless publish lets the backend
+apply its own default and grant rights you never chose. Dataverse remotes
+additionally require contact_email. Run 'datapin check <slug>' first — its
+errors are exactly what publish refuses.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runPublish(cmd.Context(), args)

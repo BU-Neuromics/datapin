@@ -15,6 +15,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Documentation now leads with archive publication, not OSF** (#40). README
+  and the agent skill (`skills/datapin/SKILL.md`) were still OSF-first
+  documents — the skill's trigger description literally opened with "Use when
+  working with the Open Science Framework". Both are restructured: publishing
+  datasets with DOIs to Zenodo/InvenioRDM, Dataverse, and Figshare comes first,
+  journal-versioned workspace remotes (dir/S3/SFTP, with their URL and
+  credential forms) are the second pillar, and OSF is a clearly-marked frozen
+  legacy section that points at `datapin migrate` and says support ends after
+  the OSF shutdown. The skill description now triggers on FAIR data
+  publication, DOI minting, research data archiving, and each backend by name
+  while still matching OSF-shaped questions.
+- **CLI help text caught up with the CLI.** `datapin --help` said archive
+  backends "are on the way" (they shipped in v0.1.0/v0.2.0); `remote` and
+  `remote add` described only InvenioRDM and pointed at a `--token` flag that
+  does not store remote credentials (`--token-value` does); and `pull`, `push`,
+  `versions`, and `open` documented only their OSF forms, never their dataset
+  and workspace forms. `publish` now states the license requirement (D37) and
+  Dataverse's `contact_email` (D38) in its help.
+
 - **`datapin onboard` now onboards into the publish workflow** (#25, D53):
   choose an archive remote (Zenodo sandbox first — rehearse where the DOIs are
   fake), group local files into a `[[datasets]]` entry, and fill in the

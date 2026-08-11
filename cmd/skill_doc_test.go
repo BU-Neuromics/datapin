@@ -130,7 +130,7 @@ func TestSkill_DescriptionMentionsEveryCommandGroup(t *testing.T) {
 
 	// Deliberate omissions from the trigger text, with reasons.
 	excused := map[string]string{
-		"onboard": "TTY-only interactive wizard; the skill steers agents to init+add+sync instead",
+		"onboard": "TTY-only interactive wizard; the skill steers agents to `remote add` plus direct manifest edits instead",
 	}
 
 	for _, c := range rootCmd.Commands() {

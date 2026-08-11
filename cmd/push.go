@@ -30,8 +30,18 @@ var (
 
 var pushCmd = &cobra.Command{
 	Use:   "push [<src> <project>:<path>]",
-	Short: "Upload a file or directory to an OSF project",
-	Long: `Upload a local file or directory to an OSF project.
+	Short: "Push a dataset to its workspace remote, or files to an OSF project",
+	Long: `Upload local data to a remote.
+
+A bare argument naming a manifest dataset pushes that dataset's files to its
+workspace remote, journal-versioned and with no DOI:
+  datapin push counts
+Superseded bytes are archived server-side before an overwrite, so every version
+datapin wrote stays revertible ('datapin versions <slug>/<key>', 'datapin
+revert'). To publish a dataset with a DOI instead, use 'datapin publish'.
+
+The remaining forms address the legacy OSF surface (frozen — see
+'datapin migrate').
 
 With no arguments, publishes every tracked file that holds local work the remote
 does not have: files modified since they were last synced, and files never

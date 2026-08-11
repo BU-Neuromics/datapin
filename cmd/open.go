@@ -16,11 +16,16 @@ import (
 
 var openCmd = &cobra.Command{
 	Use:   "open <project>[:<path>]",
-	Short: "Open an OSF project or file in the browser",
-	Long: `Constructs the osf.io URL for the given project or path and opens it in
-the default browser. On headless systems, prints the URL instead.
+	Short: "Open a dataset's archive record, or an OSF project, in the browser",
+	Long: `Open a landing page in the default browser. On headless systems, prints
+the URL instead.
 
-Examples:
+A bare argument naming a manifest dataset opens its published record on the
+archive remote:
+  datapin open counts
+
+An OSF address opens the osf.io page for that project or path (frozen legacy
+surface — see 'datapin migrate'):
   datapin open abc12                  # opens https://osf.io/abc12/
   datapin open abc12:/data            # opens the /data folder in the OSF web UI
   datapin open abc12:/data/file.csv   # opens the file in the OSF web UI`,
