@@ -68,7 +68,7 @@ Examples:
 		}
 		manifestPath, repoRoot, err := manifest.FindManifest()
 		if manifest.IsNotFound(err) {
-			return fmt.Errorf("no .datapin/datapin.toml found — run 'datapin init <project-id>' to start tracking this repo, then 'datapin add' / 'datapin pull' to register files")
+			return fmt.Errorf("no .datapin/datapin.toml found — run 'datapin onboard' to set up publishing (archive remote + dataset), or 'datapin init <project-id>' for the legacy OSF workspace flow")
 		}
 		if err != nil {
 			return err
