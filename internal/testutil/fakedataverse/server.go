@@ -547,15 +547,18 @@ func (s *Server) maybeFinalize(d *dataset, cost int) {
 	d.lockType = ""
 }
 
+// versionsList mirrors real Dataverse's ordering (LIVE-VERIFIED): the
+// draft first when present, then released versions NEWEST-first. A
+// driver that trusts listing order pins the oldest version as latest.
 func (s *Server) versionsList(w http.ResponseWriter, d *dataset) {
 	var out []any
-	for _, v := range d.published {
-		out = append(out, map[string]any{
-			"versionNumber": v.number, "versionMinorNumber": 0, "versionState": "RELEASED",
-		})
-	}
 	if d.draft != nil {
 		out = append(out, map[string]any{"versionState": "DRAFT"})
+	}
+	for i := len(d.published) - 1; i >= 0; i-- {
+		out = append(out, map[string]any{
+			"versionNumber": d.published[i].number, "versionMinorNumber": 0, "versionState": "RELEASED",
+		})
 	}
 	if out == nil {
 		out = []any{}
