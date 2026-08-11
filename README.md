@@ -201,6 +201,7 @@ $ datapin remote add https://zenodo.org --name zenodo --token-value "$ZENODO_TOK
 $ datapin remote add https://demo.dataverse.org/dataverse/mylab --name dv --kind dataverse
 $ datapin remote add https://api.figshare.com --name fig --kind figshare
 $ datapin remote ls                 # names, kinds, URLs, and whether each has a token
+$ datapin remote probe zenodo       # re-probe an archive remote's capabilities
 $ datapin remote rm sandbox         # forget the remote and delete its stored token
 ```
 
@@ -215,12 +216,27 @@ $ datapin remote rm sandbox         # forget the remote and delete its stored to
 Per-remote token lookup order: `DATAPIN_TOKEN_<NAME>` environment variable →
 OS keychain → `~/.config/datapin/tokens/<name>`.
 
+**Per-instance capabilities.** An institutional InvenioRDM instance is not
+zenodo.org, so `remote add` asks each one what it declares about itself and
+stores the answer under `[remotes.<name>.caps]` in `config.toml` — no later
+command re-probes. Today that means the instance's **resource-type
+vocabulary** (`datapin check` errors on a `resource_type` it does not offer,
+because publishing would be rejected) and whether it supports **multipart
+uploads** (inferred from the file schema it serves; a large upload falls back
+to a single PUT if the instance rejects the multipart transfer). The
+per-record file count and size limits are exposed by no InvenioRDM endpoint,
+so datapin uses the documented Zenodo profile (100 files, 50 GB) and lets you
+override it by hand in that same table — hand-edited values always win.
+`datapin remote probe <name>` re-probes in place (a vocabulary that grew, or a
+remote added with `--no-verify`); a failed probe leaves the stored values
+untouched.
+
 Backend differences that are visible to you:
 
 - **`invenio`** — Zenodo and any InvenioRDM instance. Per-version DOIs under a
   stable concept DOI. Unchanged files are imported server-side on a new
-  version. Files over 100 MiB upload in parts (multipart `M` transfer)
-  automatically.
+  version. Files over 100 MiB upload in parts (multipart `M` transfer) when the
+  instance supports it.
 - **`figshare`** — per-version `.vN` DOIs under a stable base DOI. A new
   version is the mutable account draft, so there is no server-side files
   import.
@@ -275,8 +291,9 @@ $ datapin check --fair             # also run an F-UJI FAIR assessment
 ```
 
 Errors: a missing title, no creators, a malformed ORCID (ISO 7064 checksum), a
-`license` that is not an SPDX id (with a did-you-mean), a related identifier
-that is blank or carries a non-DataCite `relation`, a file set that exceeds the
+`license` that is not an SPDX id (with a did-you-mean), a `resource_type` the
+target instance's probed vocabulary does not offer, a related identifier that
+is blank or carries a non-DataCite `relation`, a file set that exceeds the
 backend's record cap.
 Warnings: no description, no keywords, no ORCID for a creator, **no license**
 (drafting without one is fine — publishing is not), an NC/ND license, a

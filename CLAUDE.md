@@ -35,7 +35,7 @@ Architecture and roadmap: [`docs/reboot-plan.md`](./docs/reboot-plan.md)
 (§2.4 Zenodo API, §4.1–4.7 architecture, §6 testing, §8 phases); release
 ladder to v1.0 in [`ROADMAP.md`](./ROADMAP.md) and issue #40.
 Settled decisions D1–D10 — do not relitigate:
-[`docs/datapin-handoff.md`](./docs/datapin-handoff.md); D11–D53 in
+[`docs/datapin-handoff.md`](./docs/datapin-handoff.md); D11–D56 in
 [`docs/decisions.md`](./docs/decisions.md).
 
 **Module path:** `github.com/BU-Neuromics/datapin`
@@ -146,7 +146,7 @@ adapter interface, workspace vs archive remotes, Zenodo/InvenioRDM) is in
 
 ## Archive publication (datasets → Zenodo/InvenioRDM)
 
-The FAIR-publication side added in the reboot (plan §4; decisions D11–D53
+The FAIR-publication side added in the reboot (plan §4; decisions D11–D56
 in `docs/decisions.md`). The legacy OSF sync surface above is untouched (D12).
 
 **Packages:**
@@ -161,7 +161,14 @@ in `docs/decisions.md`). The legacy OSF sync surface above is untouched (D12).
   transfer instead (serial parts to the pre-authorized part URLs; any
   failure deletes the pending entry so the draft stays publishable; the
   commit checksum is verified only when it is an md5 — D43–D45, threshold
-  and part size injectable via `WithMultipartThreshold`/`WithPartSize`);
+  and part size injectable via `WithMultipartThreshold`/`WithPartSize`),
+  **gated by `Caps.MultipartUpload`** and falling back to the single PUT
+  when an instance rejects the `M` transfer type at registration (D56 — no
+  bytes are read before that point); `DefaultCaps(url)` is the Zenodo
+  profile and `WithCaps` replaces it with a remote's stored/probed caps;
+  `Probe` (D54/D55) reads the instance's resource-type vocabulary and
+  infers the transfer model, and reports in `Notes` what it could not
+  learn rather than guessing;
   DOIs read defensively from both legacy and RDM response
   shapes (D19); publish is never blind-retried on 5xx — it reconciles by
   re-GET because publish can 504 while succeeding (zenodo#2131, D18);
@@ -176,7 +183,11 @@ in `docs/decisions.md`). The legacy OSF sync surface above is untouched (D12).
   Phase 0 spike findings (`docs/zenodo-notes.md`, fixtures under its
   `fixtures/`): hybrid response shapes, idempotent `POST /versions`,
   all-or-nothing files-import on an empty draft, atomic 100-file cap at
-  registration, empty files accepted, publish-twice → 404.
+  registration, empty files accepted, publish-twice → 404. It also serves
+  the introspection surface the caps probe reads (paginated resource-type
+  vocabulary, anonymous record search, `transfer` in file listings) with
+  knobs for each — `ResourceTypes`, `VocabularyStatus`,
+  `LegacyFileSchema` (pre-v13 file shape), `RejectMultipart`.
 - `internal/meta` — metadata validation (DataCite floor, embedded SPDX id
   list, ORCID ISO 7064 checksums, DataCite relationTypes, NC/ND warnings),
   Data Package v2 + RO-Crate 1.2 serializers, DOI content-negotiation
@@ -192,9 +203,16 @@ metadata block, files with flat keys defaulting to the local basename);
 `[site]` + `[[site.pages]]` drive the generated site. `[[files]]`/
 `[[wikis]]` keep their OSF semantics unchanged.
 
-**Commands:** `remote add/ls/rm` (named archive remotes in config.toml;
-per-remote tokens via `DATAPIN_TOKEN_<NAME>` > keychain >
-`~/.config/datapin/tokens/<name>`), `publish [<slug>]` (plan → loud
+**Commands:** `remote add/ls/probe/rm` (named archive remotes in
+config.toml; per-remote tokens via `DATAPIN_TOKEN_<NAME>` > keychain >
+`~/.config/datapin/tokens/<name>`; `add` probes an archive instance once
+and stores what it declared under `[remotes.<name>.caps]`, `probe`
+re-probes in place, `--no-verify` skips and keeps every default — issue
+#20, D54–D56: probed = resource-type vocabulary + multipart transfer
+model; defaulted-and-documented = per-record file count/size, which the
+InvenioRDM API exposes nowhere and which the same caps table overrides by
+hand. `check` validates `resource_type` against the probed vocabulary),
+`publish [<slug>]` (plan → loud
 PUBLIC/PERMANENT confirm → transaction → re-pin → DOI + citation;
 `--reserve`, `--dry-run`, `--force`; `--yes` mandatory in JSON mode),
 `versions <slug>` / `pull <slug> [--latest]` / `open <slug>` (bare-word

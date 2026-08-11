@@ -169,6 +169,29 @@ func TestCheckFiles(t *testing.T) {
 	}
 }
 
+// A dataset's resource_type must exist in the target instance's own
+// vocabulary, probed at `remote add` time (issue #20). An empty vocabulary
+// means nothing was probed — say nothing rather than guess.
+func TestCheckResourceType(t *testing.T) {
+	vocab := []string{"dataset", "software", "publication-article"}
+	if issues := meta.CheckResourceType("dataset", vocab); len(issues) != 0 {
+		t.Errorf("a vocabulary id must pass, got %+v", issues)
+	}
+	if issues := meta.CheckResourceType("", vocab); len(issues) != 0 {
+		t.Errorf("an empty resource_type is defaulted elsewhere, got %+v", issues)
+	}
+	issues := meta.CheckResourceType("datset", vocab)
+	if !hasError(issues, "resource_type") {
+		t.Fatalf("an id outside the instance vocabulary must be an error, got %+v", issues)
+	}
+	if !strings.Contains(issues[0].Message, "dataset") {
+		t.Errorf("the message should list what the instance offers, got %q", issues[0].Message)
+	}
+	if len(meta.CheckResourceType("anything", nil)) != 0 {
+		t.Error("an unprobed (empty) vocabulary must not produce issues")
+	}
+}
+
 func TestValidORCIDChecksums(t *testing.T) {
 	// Well-known valid ORCIDs (checksum digit exercises the X case too).
 	valid := []string{"0000-0002-1825-0097", "0000-0001-5109-3700", "0000-0002-1694-233X"}

@@ -118,6 +118,7 @@ are workspace remotes (no DOIs). Tokens are stored per remote, never in
 datapin remote add <url> --name <name> [--kind invenio|figshare|dataverse|dir|s3|sftp] \
     [--token-value <tok>] [--no-verify] [--no-keychain]
 datapin remote ls [--output=json]        # name, kind, URL, and whether a token is stored
+datapin remote probe <name>              # re-probe an archive remote's capabilities
 datapin remote rm <name>                 # remove a remote and delete its stored token
 ```
 
@@ -125,11 +126,34 @@ datapin remote rm <name>                 # remove a remote and delete its stored
 workspace kinds: can it be listed) and refuses with a hint to pass
 `--no-verify` if not. `--name` is required.
 
+**Per-instance capabilities (InvenioRDM).** The probe also records what the
+instance declares about itself under `[remotes.<name>.caps]` in
+`config.toml`, so no later command re-probes and institutional instances are
+not assumed to behave like zenodo.org:
+
+- `resource_types` — the instance's resource-type vocabulary. `datapin check`
+  errors when a dataset's `resource_type` is not in it, because publishing
+  would be rejected.
+- `multipart_upload` — inferred from the file schema the instance serves
+  (pre-InvenioRDM-v13 instances have no multipart transfer). Absent when it
+  could not be determined; a large upload falls back to a single PUT if the
+  instance rejects the multipart transfer type.
+- `max_files_per_record` / `max_file_size` — **not** exposed by the
+  InvenioRDM API, so they are absent by default and datapin uses the
+  documented Zenodo profile (100 files, 50 GB). Add them to the caps table by
+  hand to match an institutional instance's real limits; hand-edited values
+  always win.
+
+`datapin remote probe <name>` re-probes in place — for a vocabulary that grew,
+or a remote added with `--no-verify`. A failed probe leaves the stored values
+untouched. Only what the API actually exposes is stored; the rest is reported
+as a documented default rather than guessed at.
+
 ### Archive kinds
 
 | Kind | Notes |
 |------|-------|
-| `invenio` | Zenodo and any InvenioRDM instance. Per-version DOIs under a stable concept DOI; unchanged files import server-side on a new version; files over 100 MiB upload multipart automatically. |
+| `invenio` | Zenodo and any InvenioRDM instance. Per-version DOIs under a stable concept DOI; unchanged files import server-side on a new version; files over 100 MiB upload multipart when the instance supports it (see per-instance capabilities below). |
 | `figshare` | Per-version `.vN` DOIs under a stable base DOI. A new version is the mutable account draft — no server-side files import. |
 | `dataverse` | **One DOI for all versions** (version picker on the landing page). Collection alias rides on the URL: `https://host/dataverse/<alias>` (default `root`). Requires `contact_email` in the dataset metadata. |
 
@@ -212,9 +236,10 @@ datapin cite <slug> [--bibtex]           # paste-ready citation via DOI content 
 
 `datapin check` errors are exactly what `publish` refuses: no title, no
 creators, a blank creator name, a malformed ORCID (ISO 7064 checksum), a
-`license` that is not an SPDX id (with a did-you-mean), a blank related
-identifier or a non-DataCite `relation`, a file set over the backend's record
-cap. Warnings are FAIR nudges: no description, no keywords, no ORCID, **no
+`license` that is not an SPDX id (with a did-you-mean), a `resource_type` the
+target instance's probed vocabulary does not offer, a blank related identifier
+or a non-DataCite `relation`, a file set over the backend's record cap.
+Warnings are FAIR nudges: no description, no keywords, no ORCID, **no
 license**, an NC/ND license, a zero-byte file. Exit 0 when there are no errors
 (warnings allowed), 1 otherwise — CI-friendly.
 
