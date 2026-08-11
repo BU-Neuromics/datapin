@@ -136,7 +136,10 @@ func IsNotFound(err error) bool {
 // Caps declare what a configured remote can do. They are probed or
 // configured per remote, not hardcoded per backend type (plan §4.2).
 type Caps struct {
-	MintsDOI          bool
+	MintsDOI bool
+	// PerVersionDOI: each published version gets its own DOI (Zenodo,
+	// Figshare .vN). False when one DOI covers all versions (Dataverse).
+	PerVersionDOI     bool
 	ReserveDOI        bool
 	PIDKind           string // "doi" | "swhid" | "none"
 	SyncPublish       bool   // false: curation-gated (Dryad-style)

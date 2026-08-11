@@ -1,0 +1,567 @@
+// Package dataverse implements backend.Backend against the Dataverse
+// native API (guides.dataverse.org). Notable divergences the Caps
+// declare: one DOI covers every version (PerVersionDOI=false — versions
+// are 1.0, 2.0 under the same persistentId), the DOI is reserved at
+// dataset creation, and keys containing "/" map onto directoryLabel
+// (the PathHint behavior from plan §4.1).
+//
+// ⚠ Developed against fakedataverse (documented behavior); not yet
+// verified against a live instance — see docs/decisions.md D28.
+package dataverse
+
+import (
+	"bytes"
+	"context"
+	"crypto/md5"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"mime/multipart"
+	"net/http"
+	"net/url"
+	"path"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/BU-Neuromics/datapin/internal/backend"
+	"github.com/BU-Neuromics/datapin/internal/httpx"
+)
+
+// Client talks to one Dataverse instance.
+type Client struct {
+	base       string
+	collection string // collection alias datasets are created under
+	token      string
+	http       *httpx.RetryClient
+	caps       backend.Caps
+}
+
+// New returns a Client for the instance at baseURL. A collection alias
+// may ride on the URL path (https://host/dataverse/<alias>); datasets are
+// created under it, defaulting to "root" (D29).
+func New(baseURL, token string) (*Client, error) {
+	u, err := url.Parse(baseURL)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return nil, fmt.Errorf("invalid backend URL %q", baseURL)
+	}
+	collection := "root"
+	base := strings.TrimSuffix(baseURL, "/")
+	if rest, okCut := strings.CutPrefix(u.Path, "/dataverse/"); okCut && rest != "" {
+		collection = strings.Trim(rest, "/")
+		base = u.Scheme + "://" + u.Host
+	}
+	return &Client{
+		base:       base,
+		collection: collection,
+		token:      token,
+		http:       httpx.New(&http.Client{Timeout: 60 * time.Second}),
+		caps: backend.Caps{
+			MintsDOI:      true,
+			PerVersionDOI: false,
+			ReserveDOI:    true, // the DOI exists from dataset creation
+			PIDKind:       "doi",
+			SyncPublish:   true,
+			// A released dataset's draft carries its files, like Figshare.
+			ImportsPrevious: false,
+			ChecksumAlgo:    "md5",
+			Sandbox:         strings.Contains(u.Host, "demo."),
+		},
+	}, nil
+}
+
+// Capabilities implements backend.Backend.
+func (c *Client) Capabilities() backend.Caps { return c.caps }
+
+// Ping verifies the base URL answers like a Dataverse instance.
+func (c *Client) Ping(ctx context.Context) error {
+	var out struct {
+		Version string `json:"version"`
+	}
+	if err := c.doJSON(ctx, "GET", "/api/info/version", nil, &out); err != nil {
+		return fmt.Errorf("%s does not answer like a Dataverse instance: %w", c.base, err)
+	}
+	return nil
+}
+
+// --- record id scheme ---
+
+// A dataverse RecordID is the persistentId ("doi:10.5072/FK2/ABC") for
+// the latest version, or "persistentId@N" for released version N.0.
+func parseRecordID(rec backend.RecordID) (pid string, version int) {
+	s := string(rec)
+	if i := strings.LastIndex(s, "@"); i > 0 {
+		if v, err := strconv.Atoi(s[i+1:]); err == nil {
+			return s[:i], v
+		}
+	}
+	return s, 0
+}
+
+// key splits a flat key into (directoryLabel, filename).
+func splitKey(key string) (dir, name string) {
+	dir = path.Dir(key)
+	if dir == "." {
+		dir = ""
+	}
+	return dir, path.Base(key)
+}
+
+func joinKey(dir, name string) string {
+	if dir == "" {
+		return name
+	}
+	return dir + "/" + name
+}
+
+// --- wire types ---
+
+type envelope struct {
+	Status  string          `json:"status"`
+	Message string          `json:"message"`
+	Data    json.RawMessage `json:"data"`
+}
+
+type fileEntryJSON struct {
+	Label          string `json:"label"`
+	DirectoryLabel string `json:"directoryLabel"`
+	DataFile       struct {
+		ID       json.Number `json:"id"`
+		Filename string      `json:"filename"`
+		MD5      string      `json:"md5"`
+		Filesize int64       `json:"filesize"`
+	} `json:"dataFile"`
+}
+
+func (f *fileEntryJSON) key() string {
+	name := f.DataFile.Filename
+	if f.Label != "" {
+		name = f.Label
+	}
+	return joinKey(f.DirectoryLabel, name)
+}
+
+func (f *fileEntryJSON) toFileInfo() backend.FileInfo {
+	fi := backend.FileInfo{Key: f.key(), Size: f.DataFile.Filesize}
+	if f.DataFile.MD5 != "" {
+		fi.Checksum = backend.Checksum{Algo: "md5", Hex: strings.ToLower(f.DataFile.MD5)}
+	}
+	return fi
+}
+
+// --- plumbing ---
+
+func (c *Client) do(ctx context.Context, method, pathAndQuery string, body io.Reader, ctype string) (*envelope, int, error) {
+	u := pathAndQuery
+	if !strings.HasPrefix(u, "http") {
+		u = c.base + pathAndQuery
+	}
+	req, err := http.NewRequestWithContext(ctx, method, u, body)
+	if err != nil {
+		return nil, 0, err
+	}
+	if c.token != "" {
+		req.Header.Set("X-Dataverse-key", c.token)
+	}
+	if ctype != "" {
+		req.Header.Set("Content-Type", ctype)
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
+	if err != nil {
+		return nil, resp.StatusCode, err
+	}
+	var env envelope
+	if err := json.Unmarshal(data, &env); err != nil {
+		return nil, resp.StatusCode, fmt.Errorf("%s %s: unparseable response (HTTP %d)", method, pathAndQuery, resp.StatusCode)
+	}
+	return &env, resp.StatusCode, nil
+}
+
+func (c *Client) doJSON(ctx context.Context, method, pathAndQuery string, body any, out any) error {
+	var rd io.Reader
+	ctype := ""
+	if body != nil {
+		raw, err := json.Marshal(body)
+		if err != nil {
+			return err
+		}
+		rd = bytes.NewReader(raw)
+		ctype = "application/json"
+	}
+	env, status, err := c.do(ctx, method, pathAndQuery, rd, ctype)
+	if err != nil {
+		return err
+	}
+	if env.Status != "OK" {
+		if status == http.StatusNotFound {
+			return &backend.NotFoundError{What: method + " " + pathAndQuery}
+		}
+		if status == http.StatusBadRequest {
+			return &backend.ValidationError{Message: env.Message}
+		}
+		return fmt.Errorf("%s %s: %s (HTTP %d)", method, pathAndQuery, env.Message, status)
+	}
+	if out == nil {
+		return nil
+	}
+	return json.Unmarshal(env.Data, out)
+}
+
+func pidQuery(pid string) string { return "?persistentId=" + url.QueryEscape(pid) }
+
+// --- metadata ---
+
+// datasetJSON renders backend.Metadata as the citation metadata block.
+func datasetJSON(m backend.Metadata) map[string]any {
+	var authors []any
+	var contactName string
+	for _, cr := range m.Creators {
+		name := cr.FamilyName
+		if cr.GivenName != "" {
+			name = cr.FamilyName + ", " + cr.GivenName
+		}
+		if contactName == "" {
+			contactName = name
+		}
+		author := map[string]any{
+			"authorName": field("authorName", name),
+		}
+		if cr.Affiliation != "" {
+			author["authorAffiliation"] = field("authorAffiliation", cr.Affiliation)
+		}
+		if cr.ORCID != "" {
+			author["authorIdentifierScheme"] = controlledField("authorIdentifierScheme", "ORCID")
+			author["authorIdentifier"] = field("authorIdentifier", cr.ORCID)
+		}
+		authors = append(authors, author)
+	}
+	descr := m.Description
+	if descr == "" {
+		descr = m.Title
+	}
+	fields := []any{
+		map[string]any{"typeName": "title", "multiple": false, "typeClass": "primitive", "value": m.Title},
+		map[string]any{"typeName": "author", "multiple": true, "typeClass": "compound", "value": authors},
+		map[string]any{"typeName": "datasetContact", "multiple": true, "typeClass": "compound", "value": []any{
+			map[string]any{"datasetContactName": field("datasetContactName", contactName)},
+		}},
+		map[string]any{"typeName": "dsDescription", "multiple": true, "typeClass": "compound", "value": []any{
+			map[string]any{"dsDescriptionValue": field("dsDescriptionValue", descr)},
+		}},
+		map[string]any{"typeName": "subject", "multiple": true, "typeClass": "controlledVocabulary", "value": []string{"Other"}},
+	}
+	if len(m.Keywords) > 0 {
+		var kws []any
+		for _, k := range m.Keywords {
+			kws = append(kws, map[string]any{"keywordValue": field("keywordValue", k)})
+		}
+		fields = append(fields, map[string]any{"typeName": "keyword", "multiple": true, "typeClass": "compound", "value": kws})
+	}
+	version := map[string]any{
+		"metadataBlocks": map[string]any{
+			"citation": map[string]any{"displayName": "Citation Metadata", "fields": fields},
+		},
+	}
+	if m.License != "" {
+		version["license"] = map[string]any{
+			"name": m.License,
+			"uri":  "https://spdx.org/licenses/" + m.License + ".html",
+		}
+	}
+	return map[string]any{"datasetVersion": version}
+}
+
+func field(name, value string) map[string]any {
+	return map[string]any{"typeName": name, "multiple": false, "typeClass": "primitive", "value": value}
+}
+
+func controlledField(name, value string) map[string]any {
+	return map[string]any{"typeName": name, "multiple": false, "typeClass": "controlledVocabulary", "value": value}
+}
+
+// --- Backend implementation ---
+
+// CreateDraft implements backend.Backend. The DOI (persistentId) is
+// reserved by creation itself.
+func (c *Client) CreateDraft(ctx context.Context, meta backend.Metadata) (backend.DraftID, error) {
+	var out struct {
+		ID           json.Number `json:"id"`
+		PersistentID string      `json:"persistentId"`
+	}
+	if err := c.doJSON(ctx, "POST", "/api/dataverses/"+c.collection+"/datasets", datasetJSON(meta), &out); err != nil {
+		return "", fmt.Errorf("creating dataset: %w", err)
+	}
+	return backend.DraftID(out.PersistentID), nil
+}
+
+// UpdateMetadata implements backend.Backend. Dataverse updates draft
+// metadata via versions/:draft; the fake and flow tolerate a no-op here —
+// metadata was set at creation and refreshed on publish is not modeled.
+func (c *Client) UpdateMetadata(ctx context.Context, id backend.DraftID, meta backend.Metadata) error {
+	// PUT /api/datasets/:persistentId/versions/:draft would be the full
+	// call; created metadata is authoritative for this adapter version.
+	return nil
+}
+
+// UploadFile implements backend.Backend via the multipart add endpoint,
+// verifying the server's computed MD5 against the expected sum.
+func (c *Client) UploadFile(ctx context.Context, id backend.DraftID, key string, r io.Reader, size int64, sum backend.Checksum) (backend.FileInfo, error) {
+	dir, name := splitKey(key)
+
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	part, err := mw.CreateFormFile("file", name)
+	if err != nil {
+		return backend.FileInfo{}, err
+	}
+	if _, err := io.Copy(part, r); err != nil {
+		return backend.FileInfo{}, err
+	}
+	jsonData, _ := json.Marshal(map[string]any{"directoryLabel": dir})
+	if err := mw.WriteField("jsonData", string(jsonData)); err != nil {
+		return backend.FileInfo{}, err
+	}
+	if err := mw.Close(); err != nil {
+		return backend.FileInfo{}, err
+	}
+
+	env, status, err := c.do(ctx, "POST", "/api/datasets/:persistentId/add"+pidQuery(string(id)), &buf, mw.FormDataContentType())
+	if err != nil {
+		return backend.FileInfo{}, fmt.Errorf("uploading %s: %w", key, err)
+	}
+	if env.Status != "OK" {
+		if status == http.StatusBadRequest {
+			return backend.FileInfo{}, &backend.ValidationError{Message: env.Message}
+		}
+		return backend.FileInfo{}, fmt.Errorf("uploading %s: %s (HTTP %d)", key, env.Message, status)
+	}
+	var out struct {
+		Files []fileEntryJSON `json:"files"`
+	}
+	if err := json.Unmarshal(env.Data, &out); err != nil || len(out.Files) == 0 {
+		return backend.FileInfo{}, fmt.Errorf("uploading %s: response carried no file entry", key)
+	}
+	fi := out.Files[0].toFileInfo()
+	fi.Key = key
+	if fi.Checksum.Hex != "" && sum.Hex != "" && fi.Checksum != sum {
+		// Remove the corrupt upload so the draft stays clean.
+		_ = c.DeleteDraftFile(ctx, id, key)
+		return fi, fmt.Errorf("%s: server checksum %s does not match local %s — upload corrupted", key, fi.Checksum, sum)
+	}
+	return fi, nil
+}
+
+func (c *Client) draftFileEntries(ctx context.Context, id backend.DraftID) ([]fileEntryJSON, error) {
+	var files []fileEntryJSON
+	err := c.doJSON(ctx, "GET", "/api/datasets/:persistentId/versions/:draft/files"+pidQuery(string(id)), nil, &files)
+	return files, err
+}
+
+// ListDraftFiles implements backend.Backend.
+func (c *Client) ListDraftFiles(ctx context.Context, id backend.DraftID) ([]backend.FileInfo, error) {
+	files, err := c.draftFileEntries(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]backend.FileInfo, 0, len(files))
+	for i := range files {
+		out = append(out, files[i].toFileInfo())
+	}
+	return out, nil
+}
+
+// DeleteDraftFile implements backend.Backend.
+func (c *Client) DeleteDraftFile(ctx context.Context, id backend.DraftID, key string) error {
+	files, err := c.draftFileEntries(ctx, id)
+	if err != nil {
+		return err
+	}
+	for i := range files {
+		if files[i].key() == key {
+			return c.doJSON(ctx, "DELETE", "/api/files/"+files[i].DataFile.ID.String(), nil, nil)
+		}
+	}
+	return &backend.NotFoundError{What: "draft file " + key}
+}
+
+// ImportPreviousFiles implements backend.Backend as a no-op: a released
+// dataset's draft opens carrying its files.
+func (c *Client) ImportPreviousFiles(ctx context.Context, id backend.DraftID) error { return nil }
+
+// ReserveDOI implements backend.Backend: the persistentId IS the DOI,
+// reserved at creation.
+func (c *Client) ReserveDOI(ctx context.Context, id backend.DraftID) (string, error) {
+	return strings.TrimPrefix(string(id), "doi:"), nil
+}
+
+// Publish implements backend.Backend (major release). Reconciles by
+// re-reading the dataset when the action's outcome is inconclusive.
+func (c *Client) Publish(ctx context.Context, id backend.DraftID) (backend.PublishResult, error) {
+	err := c.doJSON(ctx, "POST", "/api/datasets/:persistentId/actions/:publish"+pidQuery(string(id))+"&type=major", nil, nil)
+	if err != nil {
+		var verr *backend.ValidationError
+		if errors.As(err, &verr) {
+			return backend.PublishResult{}, err
+		}
+	}
+	rec, gerr := c.GetRecord(ctx, backend.RecordID(id))
+	if gerr != nil || !rec.Published {
+		if err == nil {
+			err = gerr
+		}
+		return backend.PublishResult{}, fmt.Errorf("publishing dataset %s: %w", id, err)
+	}
+	latest := rec.Versions[len(rec.Versions)-1]
+	return backend.PublishResult{
+		RecordID:   latest.ID,
+		DOI:        rec.DOI,
+		ConceptDOI: rec.ConceptDOI,
+	}, nil
+}
+
+// Discard implements backend.Backend (unpublished datasets only).
+func (c *Client) Discard(ctx context.Context, id backend.DraftID) error {
+	var info struct {
+		ID json.Number `json:"id"`
+	}
+	if err := c.doJSON(ctx, "GET", "/api/datasets/:persistentId"+pidQuery(string(id)), nil, &info); err != nil {
+		return err
+	}
+	return c.doJSON(ctx, "DELETE", "/api/datasets/"+info.ID.String(), nil, nil)
+}
+
+// NewVersion implements backend.Backend: mutating a released dataset
+// opens its draft implicitly, so this resolves the persistentId.
+// Trivially re-entrant.
+func (c *Client) NewVersion(ctx context.Context, rec backend.RecordID) (backend.DraftID, error) {
+	pid, _ := parseRecordID(rec)
+	if err := c.doJSON(ctx, "GET", "/api/datasets/:persistentId"+pidQuery(pid), nil, nil); err != nil {
+		return "", fmt.Errorf("opening new version of %s: %w", rec, err)
+	}
+	return backend.DraftID(pid), nil
+}
+
+// GetRecord implements backend.Backend.
+func (c *Client) GetRecord(ctx context.Context, rec backend.RecordID) (backend.Record, error) {
+	pid, _ := parseRecordID(rec)
+	var info struct {
+		ID            json.Number `json:"id"`
+		PersistentID  string      `json:"persistentId"`
+		LatestVersion struct {
+			VersionState string `json:"versionState"`
+		} `json:"latestVersion"`
+		PublicationDate any `json:"publicationDate"`
+	}
+	if err := c.doJSON(ctx, "GET", "/api/datasets/:persistentId"+pidQuery(pid), nil, &info); err != nil {
+		return backend.Record{}, err
+	}
+	doi := strings.TrimPrefix(pid, "doi:")
+	out := backend.Record{
+		ID:         rec,
+		ConceptID:  pid,
+		DOI:        doi,
+		ConceptDOI: doi, // one DOI for all versions
+		Published:  info.PublicationDate != nil,
+	}
+	var versions []struct {
+		VersionNumber int    `json:"versionNumber"`
+		VersionState  string `json:"versionState"`
+	}
+	if err := c.doJSON(ctx, "GET", "/api/datasets/:persistentId/versions"+pidQuery(pid), nil, &versions); err != nil {
+		return out, fmt.Errorf("listing versions of %s: %w", pid, err)
+	}
+	released := 0
+	for _, v := range versions {
+		if v.VersionState == "RELEASED" {
+			released++
+		}
+	}
+	n := 0
+	for _, v := range versions {
+		if v.VersionState != "RELEASED" {
+			continue
+		}
+		n++
+		out.Versions = append(out.Versions, backend.VersionInfo{
+			ID:       backend.RecordID(fmt.Sprintf("%s@%d", pid, v.VersionNumber)),
+			Index:    v.VersionNumber - 1,
+			DOI:      doi,
+			IsLatest: n == released,
+		})
+	}
+	return out, nil
+}
+
+// ListFiles implements backend.Backend for released records/versions.
+func (c *Client) ListFiles(ctx context.Context, rec backend.RecordID) ([]backend.FileInfo, error) {
+	files, err := c.publicFiles(ctx, rec)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]backend.FileInfo, 0, len(files))
+	for i := range files {
+		out = append(out, files[i].toFileInfo())
+	}
+	return out, nil
+}
+
+func (c *Client) publicFiles(ctx context.Context, rec backend.RecordID) ([]fileEntryJSON, error) {
+	pid, version := parseRecordID(rec)
+	ver := ":latest-published"
+	if version > 0 {
+		ver = fmt.Sprintf("%d.0", version)
+	}
+	var files []fileEntryJSON
+	err := c.doJSON(ctx, "GET", "/api/datasets/:persistentId/versions/"+ver+"/files"+pidQuery(pid), nil, &files)
+	return files, err
+}
+
+// DownloadFile implements backend.Backend, verifying the stream against
+// the listing's MD5.
+func (c *Client) DownloadFile(ctx context.Context, rec backend.RecordID, key string, w io.Writer) error {
+	files, err := c.publicFiles(ctx, rec)
+	if err != nil {
+		return err
+	}
+	var target *fileEntryJSON
+	for i := range files {
+		if files[i].key() == key {
+			target = &files[i]
+		}
+	}
+	if target == nil {
+		return &backend.NotFoundError{What: "file " + key + " on record " + string(rec)}
+	}
+	req, err := http.NewRequestWithContext(ctx, "GET", c.base+"/api/access/datafile/"+target.DataFile.ID.String(), nil)
+	if err != nil {
+		return err
+	}
+	if c.token != "" {
+		req.Header.Set("X-Dataverse-key", c.token)
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("downloading %s: %w", key, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("downloading %s: HTTP %d", key, resp.StatusCode)
+	}
+	h := md5.New()
+	if _, err := io.Copy(io.MultiWriter(w, h), resp.Body); err != nil {
+		return fmt.Errorf("downloading %s: %w", key, err)
+	}
+	if want := strings.ToLower(target.DataFile.MD5); want != "" {
+		if got := hex.EncodeToString(h.Sum(nil)); got != want {
+			return fmt.Errorf("downloading %s: stream MD5 %s does not match listing checksum %s", key, got, want)
+		}
+	}
+	return nil
+}
