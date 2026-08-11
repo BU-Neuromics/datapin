@@ -358,7 +358,9 @@ func (s *Server) registerFiles(w http.ResponseWriter, r *http.Request, rec *reco
 			tt = "L"
 		}
 		f := &file{key: e.Key, transfer: tt, parts: e.Transfer.Parts, partSize: e.Transfer.PartSize, size: e.Size}
-		if tt == "M" {
+		// The bound re-check at the allocation site (already rejected with
+		// a 400 above) keeps the slice size visibly request-independent.
+		if tt == "M" && f.parts >= 1 && f.parts <= 10000 {
 			f.partData = make([][]byte, f.parts)
 		}
 		rec.files[e.Key] = f
