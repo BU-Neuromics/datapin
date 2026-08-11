@@ -20,7 +20,7 @@ type Remote struct {
 	Kind string `toml:"kind"` // "invenio" (Figshare, Dataverse later)
 	URL  string `toml:"url"`
 	// Caps are the per-instance capabilities probed at `remote add` time
-	// (issue #20, D53), nil when the remote was never probed (--no-verify)
+	// (issue #20, D54), nil when the remote was never probed (--no-verify)
 	// or the probe learned nothing. Hand-editable overrides live here too.
 	Caps *RemoteCaps `toml:"caps,omitempty"`
 }

@@ -7,7 +7,7 @@ import (
 )
 
 // RemoteCaps is what a remote told us about itself when it was probed
-// (`datapin remote add` / `datapin remote probe`, issue #20, D53). It is
+// (`datapin remote add` / `datapin remote probe`, issue #20, D54). It is
 // stored under `[remotes.<name>.caps]` in config.toml so runtime never
 // re-probes, and it is deliberately hand-editable: a field the instance's
 // API does not expose stays absent here and the driver's own profile
@@ -24,7 +24,7 @@ type RemoteCaps struct {
 	// user reading config.toml how stale these values are.
 	ProbedAt string `toml:"probed_at,omitempty"`
 	// MaxFilesPerRecord and MaxFileSize are 0 when the instance does not
-	// expose a limit (the common case — see D54).
+	// expose a limit (the common case — see D55).
 	MaxFilesPerRecord int   `toml:"max_files_per_record,omitempty"`
 	MaxFileSize       int64 `toml:"max_file_size,omitempty"`
 	// MultipartUpload is nil when the instance declares nothing about

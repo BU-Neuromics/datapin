@@ -159,7 +159,7 @@ type Caps struct {
 // ProbeResult is what one instance declared about itself when probed
 // (`datapin remote add`, issue #20). Every field is optional: a zero value
 // means the API exposed nothing, and the driver's own profile stands. Never
-// guess here — an invented limit is worse than a documented default (D54).
+// guess here — an invented limit is worse than a documented default (D55).
 type ProbeResult struct {
 	// ResourceTypes are the instance's resource-type vocabulary ids
 	// (InvenioRDM: GET /api/vocabularies/resourcetypes). Nil when the

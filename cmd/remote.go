@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -12,6 +14,70 @@ import (
 	"github.com/BU-Neuromics/datapin/internal/log"
 	"github.com/BU-Neuromics/datapin/internal/output"
 )
+
+// probeError marks a failure of the pre-add URL probe — the one error class
+// a caller may sensibly override (remote add's --no-verify, onboard's
+// "add it anyway?" confirm).
+type probeError struct{ err error }
+
+func (e probeError) Error() string { return e.err.Error() }
+func (e probeError) Unwrap() error { return e.err }
+
+// archiveRemoteAdd reports what addArchiveRemote did: the backend's sandbox
+// capability, whether a token was stored, and what the instance declared
+// about itself when probed (Caps is nil when the probe was skipped or
+// learned nothing — issue #20, D55).
+type archiveRemoteAdd struct {
+	Sandbox     bool
+	TokenStored bool
+	Caps        *config.RemoteCaps
+	ProbeNotes  []string
+}
+
+// addArchiveRemote constructs the driver (validating the kind), probes the
+// URL when verify is set, persists the remote together with whatever the
+// probe learned, and stores its token when one is given. Shared by
+// `remote add` and `onboard`.
+func addArchiveRemote(ctx context.Context, r config.Remote, token string, verify, noKeychain bool) (archiveRemoteAdd, error) {
+	out := archiveRemoteAdd{}
+	bk, err := newArchiveBackend(r, token)
+	if err != nil {
+		return out, err
+	}
+	out.Sandbox = bk.Capabilities().Sandbox
+	if verify {
+		log.Infof("probing %s", r.URL)
+		// A driver that can describe its instance does so (and its probe
+		// subsumes Ping); the rest only answer Ping. Prober comes first: the
+		// invenio driver satisfies both.
+		switch p := bk.(type) {
+		case backend.Prober:
+			res, perr := p.Probe(ctx)
+			if perr != nil {
+				return out, probeError{perr}
+			}
+			out.Caps = config.FromProbe(res, time.Now().UTC().Format(time.RFC3339))
+			out.ProbeNotes = res.Notes
+		case pingable:
+			if pingErr := p.Ping(ctx); pingErr != nil {
+				return out, probeError{pingErr}
+			}
+		default:
+			return out, fmt.Errorf("kind %q cannot be probed", r.Kind)
+		}
+	}
+	r.Caps = out.Caps
+	if err := config.AddRemote(r); err != nil {
+		return out, err
+	}
+	if token != "" {
+		if err := config.SaveRemoteToken(r.Name, token, noKeychain); err != nil {
+			return out, fmt.Errorf("remote added, but storing its token failed: %w", err)
+		}
+		out.TokenStored = true
+	}
+	return out, nil
+}
 
 var remoteCmd = &cobra.Command{
 	Use:   "remote",
@@ -81,43 +147,28 @@ accounts and tokens — register them as two remotes:
 					_ = closer()
 				}
 			}
+			if err := config.AddRemote(config.Remote{Name: name, Kind: remoteAddKind, URL: url}); err != nil {
+				return err
+			}
+			if remoteAddToken != "" {
+				if err := config.SaveRemoteToken(name, remoteAddToken, noKeychain); err != nil {
+					return fmt.Errorf("remote added, but storing its token failed: %w", err)
+				}
+			}
 		} else {
-			bk, err := newArchiveBackend(config.Remote{Name: name, Kind: remoteAddKind, URL: url}, remoteAddToken)
+			res, err := addArchiveRemote(cmd.Context(),
+				config.Remote{Name: name, Kind: remoteAddKind, URL: url},
+				remoteAddToken, !remoteAddNoVerify, noKeychain)
+			var pe probeError
+			if errors.As(err, &pe) {
+				return fmt.Errorf("%w\n(use --no-verify to add it anyway)", err)
+			}
 			if err != nil {
 				return err
 			}
-			sandbox = bk.Capabilities().Sandbox
-			if !remoteAddNoVerify {
-				log.Infof("probing %s", url)
-				// A driver that can describe its instance does so; the rest
-				// only answer Ping. Either way a failure is fatal here.
-				if pr, ok := bk.(backend.Prober); ok {
-					res, err := pr.Probe(cmd.Context())
-					if err != nil {
-						return fmt.Errorf("%w\n(use --no-verify to add it anyway)", err)
-					}
-					probed = config.FromProbe(res, time.Now().UTC().Format(time.RFC3339))
-					probeNotes = res.Notes
-				} else if p, ok := bk.(pingable); ok {
-					if err := p.Ping(cmd.Context()); err != nil {
-						return fmt.Errorf("%w\n(use --no-verify to add it anyway)", err)
-					}
-				} else {
-					return fmt.Errorf("kind %q cannot be probed", remoteAddKind)
-				}
-			}
+			sandbox, probed, probeNotes = res.Sandbox, res.Caps, res.ProbeNotes
 		}
-
-		if err := config.AddRemote(config.Remote{Name: name, Kind: remoteAddKind, URL: url, Caps: probed}); err != nil {
-			return err
-		}
-		tokenStored := false
-		if remoteAddToken != "" {
-			if err := config.SaveRemoteToken(name, remoteAddToken, noKeychain); err != nil {
-				return fmt.Errorf("remote added, but storing its token failed: %w", err)
-			}
-			tokenStored = true
-		}
+		tokenStored := remoteAddToken != ""
 
 		if flagOutput == "json" {
 			return output.PrintJSON(os.Stdout, output.RemoteAddResult{

@@ -22,7 +22,7 @@ const vocabPageSize = 100
 const maxVocabPages = 40
 
 // Probe derives what this InvenioRDM instance declares about itself
-// (issue #20, D53/D54). It is called once, by `datapin remote add` /
+// (issue #20, D54/D55). It is called once, by `datapin remote add` /
 // `datapin remote probe`, and its result is persisted in the remote's config
 // entry — runtime never re-probes.
 //
@@ -76,7 +76,7 @@ func (c *Client) Probe(ctx context.Context) (backend.ProbeResult, error) {
 //   - `transfer` present → the transfer model exists, multipart may be
 //     registered (true — a floor, not a permission: Zenodo registers `M` but
 //     gates part PUTs by identity, D52, and the upload path falls back on a
-//     rejected registration, D55);
+//     rejected registration, D56);
 //   - no public record with files to read → nothing is claimed (nil).
 //
 // Failures are never fatal: a closed instance that requires auth to search

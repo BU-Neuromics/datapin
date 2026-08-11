@@ -11,6 +11,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > previous life as gosf and are kept verbatim (their release links point at
 > the original gosf repository).
 
+## [Unreleased]
+
+### Added
+
+- **Per-instance capabilities for InvenioRDM remotes** (#20, D54–D56): `remote
+  add` now probes what an instance declares about itself instead of assuming
+  the Zenodo profile, and stores it under `[remotes.<name>.caps]` in
+  config.toml so no later command re-probes. Probed: the resource-type
+  vocabulary (`datapin check` errors on a `resource_type` the instance does not
+  offer) and whether the instance can do multipart uploads at all (inferred
+  from the file schema it serves — pre-InvenioRDM-v13 instances have none).
+  Not exposed by the API and therefore documented defaults: per-record file
+  count and size — add them to the caps table by hand for an institutional
+  instance. New `datapin remote probe <name>` re-probes in place (a failed
+  probe leaves stored values untouched); `--no-verify` skips probing entirely.
+  A large upload no longer fails when an instance rejects the multipart
+  transfer type — it falls back to a single PUT.
+
+### Changed
+
+- **`datapin onboard` now onboards into the publish workflow** (#25, D53):
+  choose an archive remote (Zenodo sandbox first — rehearse where the DOIs are
+  fake), group local files into a `[[datasets]]` entry, and fill in the
+  DataCite floor (title, creators with validated ORCIDs, an explicit license
+  choice — CC0-1.0 suggested, CC-BY-4.0 the named alternative, never
+  prefilled; contact e-mail required for Dataverse). It finishes by linting the
+  metadata and pointing at `datapin check <slug>` + `datapin publish <slug>`,
+  after offering the optional second track — a dir/s3/sftp workspace remote
+  for mutable intermediate results. Still TTY-only and resumable.
+- The legacy OSF workspace wizard lives on behind **`datapin onboard --osf`**
+  (deprecated — OSF is sunsetting; see `datapin migrate`). `--project` and
+  `--remote-base` now apply only to that flow and are refused without it.
+
 ## [0.2.0] - 2026-08-11
 
 The backends release: two more archive platforms and the workspace tier.

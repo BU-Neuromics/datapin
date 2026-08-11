@@ -10,7 +10,7 @@ import (
 )
 
 // TestLiveZenodo_Probe runs the per-instance capability probe (issue #20,
-// D53/D54) against the real sandbox. Everything it reads is anonymous, so
+// D54/D55) against the real sandbox. Everything it reads is anonymous, so
 // it needs no token: the resource-type vocabulary and the file-schema
 // signal that says whether the instance serves the pluggable-transfer
 // model. fakeinvenio encodes both shapes — this is the run that keeps them

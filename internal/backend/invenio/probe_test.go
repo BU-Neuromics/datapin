@@ -79,7 +79,7 @@ func TestProbe_ReadsResourceTypeVocabulary(t *testing.T) {
 
 // Nothing in the InvenioRDM API states per-record file-count or size
 // limits, so Probe must leave them unset (the caller keeps the documented
-// Zenodo default) and say so in a note rather than invent a number (D54).
+// Zenodo default) and say so in a note rather than invent a number (D55).
 func TestProbe_LimitsAreNotInvented(t *testing.T) {
 	c, _ := newClient(t)
 	p, err := c.Probe(context.Background())
@@ -159,7 +159,7 @@ func TestProbe_MultipartInconclusiveWithoutPublicRecords(t *testing.T) {
 
 // Nothing in the API declares which transfer types an instance registered,
 // so a rejected multipart registration is not fatal: no bytes have been
-// read yet, and the single-PUT path still works (D55).
+// read yet, and the single-PUT path still works (D56).
 func TestUploadFile_FallsBackWhenMultipartUnsupported(t *testing.T) {
 	srv := fakeinvenio.New(testToken)
 	t.Cleanup(srv.Close)

@@ -19,7 +19,7 @@
 // specific minimums (e.g. S3's 5 MiB part floor) are NOT modeled. Treat the
 // first live multipart run as a verification spike.
 //
-// Introspection surface (issue #20, D54), live-verified against zenodo.org
+// Introspection surface (issue #20, D55), live-verified against zenodo.org
 // and inveniordm.web.cern.ch: the paginated resource-type vocabulary
 // (`ResourceTypes`, `VocabularyStatus`), an anonymous published-record
 // search, and the file listing's `transfer` object whose absence marks a
@@ -82,7 +82,7 @@ type Server struct {
 	// LegacyFileSchema serves the pre-InvenioRDM-v13 file shape: no
 	// `transfer` object, only the legacy `storage_class` (an instance whose
 	// invenio-records-resources predates pluggable transfers, so the
-	// multipart `M` transfer cannot exist — D54).
+	// multipart `M` transfer cannot exist — D55).
 	LegacyFileSchema bool
 	// RejectMultipart makes an `M` registration fail the way an instance
 	// that never registered the multipart transfer does: HTTP 400 with the
@@ -393,7 +393,7 @@ func (s *Server) registerFiles(w http.ResponseWriter, r *http.Request, rec *reco
 		// An instance that never registered the multipart transfer rejects
 		// the type at schema validation (marshmallow OneOfSchema), before
 		// any provider check — DOCUMENTED-only (invenio-records-resources
-		// services/files/schema.py), see D55.
+		// services/files/schema.py), see D56.
 		if s.RejectMultipart {
 			writeJSON(w, 400, map[string]any{
 				"status":  400,
@@ -671,7 +671,7 @@ func (s *Server) versionsList(w http.ResponseWriter, rec *record) {
 // searchRecords is the anonymous published-record search (`GET
 // /api/records`). Only the ids matter to datapin: it is how the probe finds
 // a public record whose file listing reveals whether the instance serves
-// the pluggable-transfer file schema (D54).
+// the pluggable-transfer file schema (D55).
 func (s *Server) searchRecords(w http.ResponseWriter) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -693,7 +693,7 @@ func (s *Server) searchRecords(w http.ResponseWriter) {
 // Invenio's search REST layer does: `size` (default 25) + 1-based `page`,
 // a `hits.total` count, and a `links.next` while more pages remain. This is
 // the one introspection endpoint an InvenioRDM instance genuinely exposes
-// about itself (issue #20, D54) — `ResourceTypes` varies it per test, and
+// about itself (issue #20, D55) — `ResourceTypes` varies it per test, and
 // `VocabularyStatus` makes it fail like a non-InvenioRDM host.
 func (s *Server) resourceTypes(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()

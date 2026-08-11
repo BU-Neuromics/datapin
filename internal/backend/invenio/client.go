@@ -67,7 +67,7 @@ func WithPartSize(n int64) Option {
 }
 
 // WithCaps replaces the driver's default caps profile with a remote's
-// probed/configured capabilities (issue #20, D53). `remote add` probes an
+// probed/configured capabilities (issue #20, D54). `remote add` probes an
 // instance once and persists what it declared; every later run hands the
 // stored values back here instead of re-probing.
 func WithCaps(caps backend.Caps) Option {
@@ -98,7 +98,7 @@ func New(baseURL, token string, opts ...Option) (*Client, error) {
 // DefaultCaps is the Zenodo profile (plan §2.4) for the instance at
 // baseURL — the starting point every InvenioRDM instance gets before
 // probing (Probe) refines it and before a remote's stored caps override it
-// (WithCaps, D53/D54). The values here are the ones the API does not expose
+// (WithCaps, D54/D55). The values here are the ones the API does not expose
 // anywhere: the per-record file cap and size quota are instance
 // configuration (Zenodo's documented 100 files / 50 GB), and sandbox-ness
 // is a hostname convention.
@@ -417,16 +417,16 @@ func (c *Client) UpdateMetadata(ctx context.Context, id backend.DraftID, meta ba
 func (c *Client) UploadFile(ctx context.Context, id backend.DraftID, key string, r io.Reader, size int64, sum backend.Checksum) (backend.FileInfo, error) {
 	// Multipart is a per-instance capability, not a driver constant: an
 	// instance that does not offer the `M` transfer (or whose caps say so)
-	// takes the single-PUT path at any size (D53).
+	// takes the single-PUT path at any size (D54).
 	if c.caps.MultipartUpload && size > c.multipartThreshold {
 		fi, err := c.uploadMultipart(ctx, id, key, r, size, sum)
 		if !isUnsupportedTransfer(err) {
 			return fi, err
 		}
-		// No API declares an instance's registered transfer types (D54), so
+		// No API declares an instance's registered transfer types (D55), so
 		// a rejected registration is the only way to learn. It is rejected
 		// before any byte of r is read, so the single-PUT path below is
-		// still viable — fall through instead of failing the upload (D55).
+		// still viable — fall through instead of failing the upload (D56).
 		log.Debugf("%s rejected the multipart transfer for %s — retrying as a single PUT", c.base, key)
 	}
 	var reg filesListJSON
