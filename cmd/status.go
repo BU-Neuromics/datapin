@@ -162,6 +162,32 @@ var statusCmd = &cobra.Command{
 			}
 		}
 
+		// Classify datasets against their archive remotes (dataset-level
+		// rows: one publishable record = one row).
+		for i := range m.Datasets {
+			ds := &m.Datasets[i]
+			state, detail, err := datasetStatus(cmd.Context(), m, repoRoot, ds, statusNoCheckRemote)
+			if err != nil {
+				return err
+			}
+			if state != "IN_SYNC" {
+				allInSync = false
+			}
+			if jsonMode {
+				jsonItems = append(jsonItems, output.StatusItem{
+					Path: ds.Slug, Kind: "dataset", State: state,
+					DeclaredVersion: ds.Version,
+				})
+			} else {
+				rows = append(rows, []output.Cell{
+					{Text: datasetStateGlyph(state), Style: datasetStateStyle(state)},
+					{Text: ds.Slug},
+					{Text: verLabel(ds.Version)},
+					{Text: detail, Style: output.Dim},
+				})
+			}
+		}
+
 		if jsonMode {
 			if err := output.PrintJSON(os.Stdout, jsonItems); err != nil {
 				return err

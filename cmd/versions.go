@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -26,6 +27,13 @@ Examples:
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// A bare argument that names a manifest dataset lists the archive
+		// record's version chain instead of an OSF file's versions.
+		if !strings.Contains(args[0], ":") {
+			if handled, err := runDatasetVersions(cmd.Context(), args[0]); handled {
+				return err
+			}
+		}
 		target, err := resolver.ParseTarget(args[0])
 		if err != nil {
 			return err

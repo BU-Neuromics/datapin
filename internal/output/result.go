@@ -194,3 +194,25 @@ type MkdirResult struct {
 	Created bool   `json:"created"`
 	DryRun  bool   `json:"dry_run"`
 }
+
+// RemoteAddResult is emitted by `datapin remote add --output=json`.
+type RemoteAddResult struct {
+	Name        string `json:"name"`
+	Kind        string `json:"kind"`
+	URL         string `json:"url"`
+	Sandbox     bool   `json:"sandbox"`
+	TokenStored bool   `json:"token_stored"`
+}
+
+// RemoteListEntry is one row of `datapin remote ls --output=json`.
+type RemoteListEntry struct {
+	Name     string `json:"name"`
+	Kind     string `json:"kind"`
+	URL      string `json:"url"`
+	HasToken bool   `json:"has_token"`
+}
+
+// RemoteRmResult is emitted by `datapin remote rm --output=json`.
+type RemoteRmResult struct {
+	Name string `json:"name"`
+}

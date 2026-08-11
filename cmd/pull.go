@@ -60,6 +60,17 @@ Path rules follow scp conventions:
 		if pullTrackOnly && len(args) == 0 {
 			return fmt.Errorf("--track-only needs a remote path to register, e.g. datapin pull abc12:/data/ --track-only")
 		}
+		// A bare argument naming a manifest dataset pulls the dataset's
+		// published bytes from its archive remote.
+		if len(args) == 1 && !strings.Contains(args[0], ":") {
+			if handled, err := runDatasetPull(cmd.Context(), args[0]); handled {
+				return err
+			}
+		}
+		if pullLatest {
+			return fmt.Errorf("--latest applies only to dataset pulls (datapin pull <slug> --latest)")
+		}
+
 		token := config.LoadToken(flagToken)
 		osfClient := client.New(token)
 		wb := client.NewWaterbutler(token)
@@ -455,5 +466,6 @@ func init() {
 	pullCmd.Flags().BoolVar(&pullForce, "force", false, "Overwrite locally-modified files with the pinned version")
 	pullCmd.Flags().StringVar(&pullResolve, "resolve", "", "Resolve divergence by taking remote: 'theirs'")
 	pullCmd.Flags().IntVarP(&pullJobs, "jobs", "j", defaultScanJobs, "Number of files to scan against the remote concurrently")
+	pullCmd.Flags().BoolVar(&pullLatest, "latest", false, "For dataset pulls: fetch the latest published version and re-pin to it")
 	rootCmd.AddCommand(pullCmd)
 }

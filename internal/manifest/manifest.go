@@ -12,15 +12,96 @@ import (
 )
 
 // Manifest is the in-memory representation of datapin.toml.
+//
+// Schema 2 adds [[datasets]] (archive publication, plan §4.3) on top of the
+// schema-1 [[files]]/[[wikis]] workspace sections, which remain valid and
+// unchanged (D13). A manifest without a schema key is schema 1.
 type Manifest struct {
-	Project ProjectConfig `toml:"project"`
-	Files   []Entry       `toml:"files"`
-	Wikis   []WikiEntry   `toml:"wikis,omitempty"`
+	Schema   int           `toml:"schema,omitempty"`
+	Project  ProjectConfig `toml:"project"`
+	Files    []Entry       `toml:"files"`
+	Wikis    []WikiEntry   `toml:"wikis,omitempty"`
+	Datasets []Dataset     `toml:"datasets,omitempty"`
 }
 
-// ProjectConfig holds the default project GUID.
+// ProjectConfig holds the default project GUID and the default archive
+// remote datasets publish to.
 type ProjectConfig struct {
-	ID string `toml:"id"`
+	ID             string `toml:"id"`
+	DefaultArchive string `toml:"default_archive,omitempty"`
+}
+
+// Dataset is one publishable record: a named group of files that publish
+// together as a DOI-carrying archive version (one dataset = one record).
+type Dataset struct {
+	Slug string `toml:"slug"`
+	// Archive names the configured archive remote; empty = the project's
+	// default_archive.
+	Archive string `toml:"archive,omitempty"`
+	// Record is the latest published version's record id ("" until the
+	// first publish); Concept is the parent id grouping all versions (D21).
+	Record     string          `toml:"record"`
+	Concept    string          `toml:"concept,omitempty"`
+	ConceptDOI string          `toml:"concept_doi"`
+	Version    int             `toml:"version"`
+	VersionDOI string          `toml:"version_doi"`
+	Metadata   DatasetMetadata `toml:"metadata,omitempty"`
+	Files      []DatasetFile   `toml:"files"`
+}
+
+// ResolveArchive returns the archive remote name for this dataset.
+func (d Dataset) ResolveArchive(defaultArchive string) string {
+	if d.Archive != "" {
+		return d.Archive
+	}
+	return defaultArchive
+}
+
+// DatasetFile pins one file of a dataset: a local path, its flat key on
+// the record, and the MD5 of the pinned published version ("" if the file
+// has never been published).
+type DatasetFile struct {
+	Local string `toml:"local"`
+	Key   string `toml:"key"`
+	MD5   string `toml:"md5"`
+}
+
+// DatasetMetadata is the publish-boundary metadata block (linted by
+// `datapin check`; enforced only when publishing — a metadata-less dataset
+// is valid while unpublished, plan §4.7).
+type DatasetMetadata struct {
+	Title        string           `toml:"title,omitempty"`
+	Description  string           `toml:"description,omitempty"`
+	License      string           `toml:"license,omitempty"`
+	Keywords     []string         `toml:"keywords,omitempty"`
+	ResourceType string           `toml:"resource_type,omitempty"`
+	Publisher    string           `toml:"publisher,omitempty"`
+	Creators     []DatasetCreator `toml:"creators,omitempty"`
+	Related      []RelatedID      `toml:"related,omitempty"`
+}
+
+// DatasetCreator is one author: display name "Family, Given", optional
+// bare ORCID and affiliation.
+type DatasetCreator struct {
+	Name        string `toml:"name"`
+	ORCID       string `toml:"orcid,omitempty"`
+	Affiliation string `toml:"affiliation,omitempty"`
+}
+
+// RelatedID is a typed cross-link (DataCite relationType semantics).
+type RelatedID struct {
+	Identifier string `toml:"identifier"`
+	Relation   string `toml:"relation"`
+}
+
+// FindDataset returns the dataset with the given slug, or nil.
+func (m *Manifest) FindDataset(slug string) *Dataset {
+	for i := range m.Datasets {
+		if m.Datasets[i].Slug == slug {
+			return &m.Datasets[i]
+		}
+	}
+	return nil
 }
 
 // Entry describes one file tracked by the manifest.
@@ -106,6 +187,20 @@ func Load(path string) (*Manifest, error) {
 			path, n, plural(n, "y", "ies"))
 	}
 
+	if m.Schema > 2 {
+		return nil, fmt.Errorf("%s: unsupported manifest schema %d (this datapin understands schema ≤ 2 — upgrade datapin)", path, m.Schema)
+	}
+
+	// Convenience default (D24): a dataset file with no explicit key gets
+	// its local basename.
+	for di := range m.Datasets {
+		for fi := range m.Datasets[di].Files {
+			if m.Datasets[di].Files[fi].Key == "" {
+				m.Datasets[di].Files[fi].Key = filepath.Base(m.Datasets[di].Files[fi].Local)
+			}
+		}
+	}
+
 	if err := validate(&m); err != nil {
 		return nil, err
 	}
@@ -164,6 +259,7 @@ func Save(m *Manifest, path string) error {
 	if IsLegacyPath(path) {
 		return fmt.Errorf("legacy manifest %s is read-only — migrate it first: mv .gosf .datapin && mv .datapin/gosf.toml .datapin/datapin.toml", path)
 	}
+	m.Schema = 2 // every write is current-schema
 	data, err := toml.Marshal(m)
 	if err != nil {
 		return fmt.Errorf("marshalling manifest: %w", err)
@@ -304,6 +400,33 @@ func validate(m *Manifest) error {
 			return fmt.Errorf("duplicate (project, page) pair: project=%q page=%q", proj, w.Page)
 		}
 		seenPage[key] = true
+	}
+
+	seenSlug := make(map[string]bool)
+	for i, d := range m.Datasets {
+		if d.Slug == "" {
+			return fmt.Errorf("datasets[%d]: slug cannot be blank", i)
+		}
+		if seenSlug[d.Slug] {
+			return fmt.Errorf("duplicate dataset slug %q", d.Slug)
+		}
+		seenSlug[d.Slug] = true
+
+		seenKey := make(map[string]bool)
+		for j, f := range d.Files {
+			if f.Local == "" {
+				return fmt.Errorf("datasets[%q].files[%d]: local path cannot be blank", d.Slug, j)
+			}
+			// No duplicate local paths, across every section.
+			if seenLocal[f.Local] {
+				return fmt.Errorf("duplicate local path %q in manifest", f.Local)
+			}
+			seenLocal[f.Local] = true
+			if seenKey[f.Key] {
+				return fmt.Errorf("dataset %q: duplicate file key %q", d.Slug, f.Key)
+			}
+			seenKey[f.Key] = true
+		}
 	}
 	return nil
 }
