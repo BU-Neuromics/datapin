@@ -83,7 +83,9 @@ func (c *Client) Probe(ctx context.Context) (backend.ProbeResult, error) {
 // simply leaves the capability at its default.
 func (c *Client) probeTransferModel(ctx context.Context) (*bool, string) {
 	var search hitsJSON
-	if err := c.doJSON(ctx, "GET", "/api/records?size=5&sort=newest", nil, &search); err != nil {
+	// No sort parameter: sort vocabularies differ between instances and an
+	// unknown value is a 400, which would cost the signal for nothing.
+	if err := c.doJSON(ctx, "GET", "/api/records?size=5", nil, &search); err != nil {
 		return nil, "transfer model: the instance's record search is not readable — " +
 			"leaving multipart support at the default"
 	}
