@@ -117,7 +117,10 @@ func (s *Server) URL() string { return s.ts.URL }
 // otherwise handled identically.
 func (s *Server) PresignPartURLs() {
 	s.presign = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != "" {
+		// A pre-signed URL's signature covers a fixed header set; any
+		// header outside it (bearer tokens, an unsigned Content-Type)
+		// fails the signature check.
+		if r.Header.Get("Authorization") != "" || r.Header.Get("Content-Type") != "" {
 			w.WriteHeader(403)
 			_, _ = w.Write([]byte("<Error><Code>SignatureDoesNotMatch</Code></Error>"))
 			return
