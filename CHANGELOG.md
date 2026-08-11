@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **`datapin onboard` now onboards into the publish workflow** (#25, D52):
+- **`datapin onboard` now onboards into the publish workflow** (#25, D53):
   choose an archive remote (Zenodo sandbox first — rehearse where the DOIs are
   fake), group local files into a `[[datasets]]` entry, and fill in the
   DataCite floor (title, creators with validated ORCIDs, an explicit license

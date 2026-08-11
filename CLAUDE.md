@@ -647,7 +647,7 @@ actionable "run 'datapin auth login' or set OSF_TOKEN" message. `push`/`sync`/
 
 Interactive, resumable guided setup (TTY-only; errors under `--output=json` or a
 non-TTY). Since issue #25 it onboards into the **archive publish workflow**, not
-OSF (D52). Detects state and enters at the first unsatisfied phase:
+OSF (D53). Detects state and enters at the first unsatisfied phase:
 
 1. **manifest** — `ensurePublishManifest` creates an empty `.datapin/datapin.toml`
    when none is found (datasets need no OSF project GUID).
