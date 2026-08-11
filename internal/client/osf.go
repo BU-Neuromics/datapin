@@ -51,12 +51,31 @@ type Node struct {
 
 // NodeAttributes holds the metadata fields we care about for a node.
 type NodeAttributes struct {
-	Title        string `json:"title"`
-	Description  string `json:"description"`
-	DateCreated  string `json:"date_created"`
-	DateModified string `json:"date_modified"`
-	Public       bool   `json:"public"`
-	Category     string `json:"category"`
+	Title        string   `json:"title"`
+	Description  string   `json:"description"`
+	DateCreated  string   `json:"date_created"`
+	DateModified string   `json:"date_modified"`
+	Public       bool     `json:"public"`
+	Category     string   `json:"category"`
+	Tags         []string `json:"tags"`
+}
+
+// Contributor represents one contributor of a node. The contributors
+// endpoint embeds the user resource by default, which is where the names
+// live; the contributor's own attributes only say how they are listed.
+type Contributor struct {
+	ID         string                `json:"id"`
+	Attributes ContributorAttributes `json:"attributes"`
+	Embeds     struct {
+		Users struct {
+			Data User `json:"data"`
+		} `json:"users"`
+	} `json:"embeds"`
+}
+
+// ContributorAttributes holds how a contributor is listed on the node.
+type ContributorAttributes struct {
+	Bibliographic bool `json:"bibliographic"`
 }
 
 // FileItem represents a single file or folder entry in OSF Storage.
@@ -272,6 +291,34 @@ func (c *OSFClient) listNodesFromURL(ctx context.Context, url string) ([]Node, e
 	var all []Node
 	for url != "" {
 		var page nodesPage
+		if err := c.getJSON(ctx, withPageSize(url, maxPageSize), &page); err != nil {
+			return nil, err
+		}
+		all = append(all, page.Data...)
+		url = page.Links.Next
+	}
+	return all, nil
+}
+
+// GetChildren returns a node's direct child components, following pagination.
+// Works unauthenticated for public nodes.
+func (c *OSFClient) GetChildren(ctx context.Context, nodeID string) ([]Node, error) {
+	return c.listNodesFromURL(ctx, fmt.Sprintf("%s/nodes/%s/children/", c.baseURL, nodeID))
+}
+
+// GetContributors returns all contributors of a node, following pagination.
+// The endpoint embeds each contributor's user resource, which carries the
+// full/given/family names used for creator skeletons during migration.
+func (c *OSFClient) GetContributors(ctx context.Context, nodeID string) ([]Contributor, error) {
+	url := fmt.Sprintf("%s/nodes/%s/contributors/", c.baseURL, nodeID)
+	var all []Contributor
+	for url != "" {
+		var page struct {
+			Data  []Contributor `json:"data"`
+			Links struct {
+				Next string `json:"next"`
+			} `json:"links"`
+		}
 		if err := c.getJSON(ctx, withPageSize(url, maxPageSize), &page); err != nil {
 			return nil, err
 		}
