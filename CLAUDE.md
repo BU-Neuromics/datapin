@@ -5,9 +5,13 @@
 `datapin` is a single-binary Go CLI that keeps a project's data files
 verifiably in sync with remote storage via a committed manifest with git-like
 safety gates. It is the reboot of `gosf` (an OSF client) into a multi-backend
-FAIR data publication tool: workspace remotes (OSF today) keep the mutable
-push/pull/sync workflow; archive backends (Zenodo/InvenioRDM first) will add
-DOI-minting `publish`. Distributed to researchers; CLI-only (no SDK scope).
+FAIR data publication tool. Backend matrix (all shipped): archive backends
+(Zenodo/any InvenioRDM, Figshare, Dataverse) behind one `backend.Backend`
+interface with DOI-minting `publish`; workspace remotes (OSF via the legacy
+[[files]] flow, plus dir/S3/SFTP with journal-versioned dataset sync) for
+mutable, DOI-free intermediate results. Distributed to researchers;
+CLI-only (no SDK scope). Released: v0.1.0 (core+Zenodo+site), v0.2.0
+(Figshare/Dataverse/workspaces).
 
 Architecture and roadmap: [`docs/reboot-plan.md`](./docs/reboot-plan.md)
 (§2.4 Zenodo API, §4.1–4.7 architecture, §6 testing, §8 phases).
@@ -138,6 +142,31 @@ metadata → clear pending entries → publish → atomic manifest re-pin.
 Failures before publish discard the draft (except `--reserve`); metadata
 completeness is enforced only at this boundary (`publishPreflight` →
 `meta.Check`).
+
+**More adapters (Phase 4)**: `internal/backend/figshare` (parted
+uploads, `.vN` DOIs, account-draft version model — no files-import) and
+`internal/backend/dataverse` (one DOI across versions —
+`Caps.PerVersionDOI=false`; directoryLabel for path keys; collection
+alias on the remote URL). `internal/backend/contracttest` is the
+cross-adapter contract suite every driver must pass; run it against a
+new adapter's fake AND (when credentials exist) its live sandbox. ⚠
+`fakefigshare`/`fakedataverse` encode DOCUMENTED behavior only (D28) —
+treat first live runs as verification spikes; only `fakeinvenio` is
+fixture-verified against a real service.
+
+**Workspace subsystem (Phase 5)**: `internal/workspace` implements the
+D4 journal scheme once over a 6-method `Store` — content-addressed
+archives under `.datapin/versions/<key>/<md5>`, an append-only journal
+under `.datapin/journal/`, revert-as-new-event, GC with unrecoverable
+reporting, out-of-band overwrite detection that archives the foreign
+bytes (D36). Drivers: `localdir` (also the hermetic test vehicle),
+`s3ws` (minio-go; `s3://endpoint/bucket/prefix`, token
+"ACCESS:SECRET", D34), `sftpws` (agent/key/password ladder,
+known_hosts). Invariant, encoded as a test: every version datapin
+wrote is revertible. Commands: `push <slug>`, `pull <slug>
+--workspace`, `versions <slug>/<key>`, `revert <slug>/<key> --to N`,
+`gc --keep N`; dataset `workspace` field / `default_workspace` (D32);
+kind implies role (D33).
 
 **Backward compat with gosf** (kept until migration completes): legacy
 `.gosf/gosf.toml` loads read-only (`Save` refuses with a migration hint),
