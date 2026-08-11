@@ -467,5 +467,6 @@ func init() {
 	pullCmd.Flags().StringVar(&pullResolve, "resolve", "", "Resolve divergence by taking remote: 'theirs'")
 	pullCmd.Flags().IntVarP(&pullJobs, "jobs", "j", defaultScanJobs, "Number of files to scan against the remote concurrently")
 	pullCmd.Flags().BoolVar(&pullLatest, "latest", false, "For dataset pulls: fetch the latest published version and re-pin to it")
+	pullCmd.Flags().BoolVar(&pullWorkspace, "workspace", false, "For dataset pulls: fetch the current workspace bytes instead of archive bytes")
 	rootCmd.AddCommand(pullCmd)
 }

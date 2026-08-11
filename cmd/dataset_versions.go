@@ -35,9 +35,13 @@ func runDatasetVersions(ctx context.Context, slug string) (handled bool, err err
 	if err != nil {
 		return true, err
 	}
-	ds := m.FindDataset(slug)
+	ds, key := splitSlugKey(m, slug)
 	if ds == nil {
 		return false, nil
+	}
+	if key != "" {
+		// <slug>/<key>: the workspace journal for one file.
+		return true, runWorkspaceVersions(ctx, m, ds, key)
 	}
 
 	if ds.Record == "" {
