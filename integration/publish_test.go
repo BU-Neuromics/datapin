@@ -373,3 +373,19 @@ func TestDatasetPull_PinMismatchFailsLoudly(t *testing.T) {
 		t.Fatal("pull wrote bytes despite the pin mismatch")
 	}
 }
+
+// The no-manifest hint must offer the publish-first path (onboard), not
+// only the OSF-shaped 'init <project-id>' — a researcher publishing to
+// Zenodo has no OSF GUID to type (issue #40's docs/UX gate).
+func TestNoManifest_HintOffersOnboard(t *testing.T) {
+	e := newInvenioEnv(t)
+	for _, cmd := range []string{"status", "sync"} {
+		_, stderr, code := e.run(cmd)
+		if code == 0 {
+			t.Fatalf("%s without a manifest exited 0", cmd)
+		}
+		if !strings.Contains(stderr, "datapin onboard") {
+			t.Errorf("%s hint does not mention 'datapin onboard':\n%s", cmd, stderr)
+		}
+	}
+}
