@@ -93,6 +93,17 @@ func runDatasetPull(ctx context.Context, slug string) (handled bool, err error) 
 		}
 		dest := filepath.Join(repoRoot, f.Local)
 
+		// The pin is the source of truth for a pinned pull: a listing that
+		// contradicts it means the record does not carry the pinned bytes
+		// at this key (the live Dataverse rename bug published v1's file
+		// under v2's key). Fail loudly instead of delivering wrong bytes
+		// and clobbering the pin.
+		if !repin && f.MD5 != "" && rf.Checksum.Hex != "" && rf.Checksum.Hex != f.MD5 {
+			return true, fmt.Errorf(
+				"record %s file %s has checksum %s but the manifest pins %s — the published version does not match the pin (datapin pull %s --latest re-pins to what the remote serves)",
+				target, f.Key, rf.Checksum.Hex, f.MD5, slug)
+		}
+
 		// Idempotent: a local file already matching the remote checksum is
 		// not re-downloaded.
 		if sum, err := computeLocalMD5(dest); err == nil && sum == rf.Checksum.Hex {

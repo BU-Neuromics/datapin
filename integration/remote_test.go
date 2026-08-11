@@ -5,7 +5,6 @@ package integration
 import (
 	"bytes"
 	"encoding/json"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -35,7 +34,7 @@ func (e *invenioEnv) run(args ...string) (stdout, stderr string, code int) {
 	e.t.Helper()
 	cmd := exec.Command(binaryPath, args...)
 	cmd.Dir = e.dir
-	cmd.Env = append(os.Environ(),
+	cmd.Env = append(hermeticEnv(),
 		"HOME="+e.dir,
 		"XDG_CONFIG_HOME="+filepath.Join(e.dir, ".config"),
 		"OSF_TOKEN=", // archive tests never talk to OSF

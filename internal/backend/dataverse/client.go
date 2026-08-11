@@ -449,6 +449,23 @@ func (c *Client) UploadFile(ctx context.Context, id backend.DraftID, key string,
 	}
 	dir, name := splitKey(key)
 
+	// Replace-in-place: Dataverse does not reject a duplicate label+dir —
+	// it silently renames the incoming file (live-verified: data.csv →
+	// data-1.csv). Delete any existing same-key entry first so re-runs
+	// stay idempotent and the key never shifts.
+	if existing, lerr := c.draftFileEntries(ctx, id); lerr == nil {
+		for i := range existing {
+			if existing[i].key() == key {
+				if derr := c.doJSON(ctx, "DELETE", "/api/files/"+existing[i].DataFile.ID.String(), nil, nil); derr != nil {
+					return backend.FileInfo{}, fmt.Errorf("replacing %s: %w", key, derr)
+				}
+				break
+			}
+		}
+	} else if !backend.IsNotFound(lerr) {
+		return backend.FileInfo{}, fmt.Errorf("listing draft before uploading %s: %w", key, lerr)
+	}
+
 	var buf bytes.Buffer
 	mw := multipart.NewWriter(&buf)
 	part, err := mw.CreateFormFile("file", name)
@@ -487,7 +504,12 @@ func (c *Client) UploadFile(ctx context.Context, id backend.DraftID, key string,
 		return backend.FileInfo{}, fmt.Errorf("uploading %s: response carried no file entry", key)
 	}
 	fi := out.Files[0].toFileInfo()
-	fi.Key = key
+	if fi.Key != key {
+		// The server renamed the upload (duplicate label) — a published
+		// version would carry the wrong key. Remove it and fail loudly.
+		_ = c.doJSON(ctx, "DELETE", "/api/files/"+out.Files[0].DataFile.ID.String(), nil, nil)
+		return backend.FileInfo{}, fmt.Errorf("uploading %s: Dataverse stored it as %q (name collision in the draft) — upload aborted", key, fi.Key)
+	}
 	if fi.Checksum.Hex != "" && sum.Hex != "" && fi.Checksum != sum {
 		// Remove the corrupt upload so the draft stays clean.
 		_ = c.DeleteDraftFile(ctx, id, key)
@@ -496,9 +518,24 @@ func (c *Client) UploadFile(ctx context.Context, id backend.DraftID, key string,
 	return fi, nil
 }
 
+// draftFileEntries lists the draft's files. LIVE-VERIFIED subtlety: a
+// released dataset has no readable :draft version until a mutation
+// lazily opens one — the read 404s. The implicit draft's contents are
+// exactly the latest released version's files (that is what the first
+// mutation seeds it with), so fall back to :latest-published. Without
+// this fallback the publish transaction saw an "empty" draft, skipped
+// the replace-delete, and Dataverse silently renamed the duplicate
+// upload (data.csv → data-1.csv) into the published version.
 func (c *Client) draftFileEntries(ctx context.Context, id backend.DraftID) ([]fileEntryJSON, error) {
 	var files []fileEntryJSON
 	err := c.doJSON(ctx, "GET", "/api/datasets/:persistentId/versions/:draft/files"+pidQuery(string(id)), nil, &files)
+	if backend.IsNotFound(err) {
+		var published []fileEntryJSON
+		if perr := c.doJSON(ctx, "GET", "/api/datasets/:persistentId/versions/:latest-published/files"+pidQuery(string(id)), nil, &published); perr == nil {
+			return published, nil
+		}
+		// Neither a draft nor a published version — surface the original.
+	}
 	return files, err
 }
 

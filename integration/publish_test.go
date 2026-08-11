@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -333,5 +334,42 @@ func TestOpen_DatasetRecordURL(t *testing.T) {
 	}
 	if !strings.Contains(res.URL, "/records/") || !strings.HasPrefix(res.URL, e.srv.URL()) {
 		t.Errorf("open URL = %q", res.URL)
+	}
+}
+
+// The pin is the source of truth for a pinned pull: when the record's
+// listing contradicts the pinned MD5 (the live Dataverse rename bug put
+// v1's file at v2's key), pull must fail loudly, not silently deliver
+// wrong bytes and clobber the pin.
+func TestDatasetPull_PinMismatchFailsLoudly(t *testing.T) {
+	e := newInvenioEnv(t)
+	e.setupDataset(t)
+	mustPublish(t, e, "counts")
+
+	// Corrupt the pin: the manifest now claims different pinned bytes
+	// than the record actually serves.
+	p := filepath.Join(e.dir, ".datapin", "datapin.toml")
+	data, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	re := regexp.MustCompile(`md5 = ['"][0-9a-f]{32}['"]`)
+	corrupted := re.ReplaceAllString(string(data), `md5 = '00000000000000000000000000000000'`)
+	if corrupted == string(data) {
+		t.Fatal("no pinned md5 found to corrupt")
+	}
+	if err := os.WriteFile(p, []byte(corrupted), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(e.dir, "results/counts.csv")); err != nil {
+		t.Fatal(err)
+	}
+
+	_, stderr, code := e.run("pull", "counts")
+	if code == 0 || !strings.Contains(stderr, "pin") {
+		t.Fatalf("pull with contradicted pin: code=%d stderr=%s", code, stderr)
+	}
+	if _, err := os.Stat(filepath.Join(e.dir, "results/counts.csv")); !os.IsNotExist(err) {
+		t.Fatal("pull wrote bytes despite the pin mismatch")
 	}
 }

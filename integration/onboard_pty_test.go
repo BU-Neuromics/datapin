@@ -92,7 +92,7 @@ func TestOnboard_PTY_EndToEnd(t *testing.T) {
 
 	cmd := exec.Command(binaryPath, "onboard")
 	cmd.Dir = env.dir
-	cmd.Env = append(os.Environ(),
+	cmd.Env = append(hermeticEnv(),
 		"DATAPIN_API_BASE="+env.srv.URL()+"/v2",
 		"DATAPIN_FILES_BASE="+env.srv.URL(),
 		"OSF_TOKEN=test-token", // skips the auth prompt
