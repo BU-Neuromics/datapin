@@ -16,12 +16,19 @@ import (
 
 var versionsCmd = &cobra.Command{
 	Use:   "versions <project>:<path>",
-	Short: "List versions of a file in an OSF project",
-	Long: `List all versions of a file in OSF Storage, newest first.
+	Short: "List a dataset's, a workspace file's, or an OSF file's versions",
+	Long: `List version history, newest first.
 
-Requires a specific file path (folders are not supported).
+A bare argument naming a manifest dataset lists its archive version chain
+(version number, record id, DOI, and which one the manifest pins):
+  datapin versions counts
 
-Examples:
+Adding a file key lists that file's workspace journal instead — every push and
+revert, and whether each version is still recoverable:
+  datapin versions counts/results/counts.h5
+
+An OSF path lists a stored file's versions (frozen legacy surface; requires a
+specific file path — folders are not supported):
   datapin versions abc12:/data/results.csv
   datapin versions abc12:/data/results.csv --output=json`,
 	Args:         cobra.ExactArgs(1),

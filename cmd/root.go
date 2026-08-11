@@ -32,9 +32,23 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:          "datapin",
-	Short:        "Pin, sync, and publish research data",
-	Long:         "datapin — pin, sync, and publish research data. Currently syncs against the Open Science Framework (osf.io); archival publication backends are on the way.",
+	Use:   "datapin",
+	Short: "Pin, sync, and publish research data",
+	Long: `datapin — pin, sync, and publish research data.
+
+Group files into a dataset in .datapin/datapin.toml, then publish it to a FAIR
+archive as an immutable, DOI-carrying record (Zenodo or any InvenioRDM
+instance, Dataverse, Figshare) — or sync it to a mutable workspace remote
+(directory, S3, SFTP) with journal versioning while it is still in flight.
+
+  datapin onboard        guided setup for your first dataset
+  datapin check          lint the metadata publish will enforce
+  datapin publish        mint a DOI
+  datapin push <slug>    workspace sync, no DOI
+
+datapin also syncs Open Science Framework projects (its original purpose).
+OSF is sunsetting its projects service, so that support is frozen and will be
+removed after the shutdown — 'datapin migrate' is the exit ramp.`,
 	SilenceUsage: true,
 	Version:      version,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
