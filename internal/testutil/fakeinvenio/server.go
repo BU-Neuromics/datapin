@@ -6,6 +6,18 @@
 // retry-after) on every response, publish-twice → 404.
 //
 // The fixtures in fixtures/ are the source of truth for these shapes.
+//
+// ⚠ Multipart (`M` transfer) — partially DOCUMENTED-only (D28/D43): the
+// registration request/response shape (per-part URLs with expirations under
+// links.parts) is fixture-verified (fixture 39), but the sandbox spike never
+// uploaded parts, so the part-PUT, commit, and abort behaviors here are
+// modeled from InvenioRDM's documented multipart transfer provider
+// (invenio-records-resources services/files/transfer/providers/multipart.py):
+// registration requires parts, size, and part_size; direct content PUTs are
+// rejected; non-final parts must match part_size exactly; commit with missing
+// parts is rejected; after commit the transfer type flips to "L"; storage-
+// specific minimums (e.g. S3's 5 MiB part floor) are NOT modeled. Treat the
+// first live multipart run as a verification spike.
 package fakeinvenio
 
 import (
@@ -43,6 +55,13 @@ type Server struct {
 	// Throttle429 makes the next N requests answer 429 (Retry-After: 0),
 	// for asserting the retry wiring.
 	Throttle429 int
+	// FailPart makes the PUT of the given part number of the given key
+	// answer 500 once (key → part number), for asserting clean aborts.
+	FailPart map[string]int
+	// AsyncMultipartChecksum makes multipart commits return the
+	// "multipart:{etag}-{part_size}" placeholder instead of an md5 —
+	// modeling the documented asynchronous checksum recomputation.
+	AsyncMultipartChecksum bool
 
 	requests []string
 }
@@ -65,8 +84,11 @@ type file struct {
 	data      []byte
 	committed bool
 	md5hex    string
+	checksum  string // wire form reported at/after commit ("md5:…" or the multipart placeholder)
 	transfer  string
 	parts     int
+	partSize  int64
+	partData  [][]byte // 0-indexed part contents; nil = part not uploaded
 	size      int64
 }
 
@@ -249,6 +271,8 @@ func (s *Server) draftSubRoute(w http.ResponseWriter, r *http.Request, rec *reco
 		s.draftFile(w, r, rec, sub[1], "")
 	case len(sub) == 3 && sub[0] == "files":
 		s.draftFile(w, r, rec, sub[1], sub[2])
+	case len(sub) == 4 && sub[0] == "files" && sub[2] == "content" && r.Method == "PUT":
+		s.partUpload(w, r, rec, sub[1], sub[3])
 	case len(sub) == 2 && sub[0] == "actions" && sub[1] == "publish" && r.Method == "POST":
 		s.publish(w, rec)
 	case len(sub) == 2 && sub[0] == "actions" && sub[1] == "files-import" && r.Method == "POST":
@@ -305,12 +329,40 @@ func (s *Server) registerFiles(w http.ResponseWriter, r *http.Request, rec *reco
 			return
 		}
 	}
+	// Multipart registrations require parts, size, and part_size — the
+	// provider raises TransferException for each (DOCUMENTED-only, D43).
+	for _, e := range entries {
+		if e.Transfer.Type != "M" {
+			continue
+		}
+		switch {
+		case e.Transfer.Parts <= 0:
+			jsonError(w, 400, "Multipart file transfer requires parts.")
+			return
+		// S3-backed multipart caps out at 10,000 parts; bounding here also
+		// keeps the per-part slice allocation below request control.
+		case e.Transfer.Parts > 10000:
+			jsonError(w, 400, "Multipart file transfer supports at most 10000 parts.")
+			return
+		case e.Size <= 0:
+			jsonError(w, 400, "Multipart file transfer requires file size.")
+			return
+		case e.Transfer.PartSize <= 0:
+			jsonError(w, 400, "Multipart file transfer to local storage requires part_size.")
+			return
+		}
+	}
 	for _, e := range entries {
 		tt := e.Transfer.Type
 		if tt == "" {
 			tt = "L"
 		}
-		f := &file{key: e.Key, transfer: tt, parts: e.Transfer.Parts, size: e.Size}
+		f := &file{key: e.Key, transfer: tt, parts: e.Transfer.Parts, partSize: e.Transfer.PartSize, size: e.Size}
+		// The bound re-check at the allocation site (already rejected with
+		// a 400 above) keeps the slice size visibly request-independent.
+		if tt == "M" && f.parts >= 1 && f.parts <= 10000 {
+			f.partData = make([][]byte, f.parts)
+		}
 		rec.files[e.Key] = f
 		rec.fileOrder = append(rec.fileOrder, e.Key)
 	}
@@ -325,6 +377,12 @@ func (s *Server) draftFile(w http.ResponseWriter, r *http.Request, rec *record, 
 	}
 	switch {
 	case action == "content" && r.Method == "PUT":
+		if f.transfer == "M" {
+			// Documented provider behavior (D43): multipart content
+			// arrives via the part URLs, never a direct PUT.
+			jsonError(w, 400, "Can not set content for multipart file, use the parts instead.")
+			return
+		}
 		data, err := io.ReadAll(r.Body)
 		if err != nil {
 			jsonError(w, 400, "Malformed request.")
@@ -337,8 +395,13 @@ func (s *Server) draftFile(w http.ResponseWriter, r *http.Request, rec *record, 
 		f.data = data
 		writeJSON(w, 200, s.fileJSON(rec, f))
 	case action == "commit" && r.Method == "POST":
+		if f.transfer == "M" {
+			s.commitMultipart(w, rec, f)
+			return
+		}
 		sum := md5.Sum(f.data)
 		f.md5hex = hex.EncodeToString(sum[:])
+		f.checksum = "md5:" + f.md5hex
 		f.committed = true
 		f.size = int64(len(f.data))
 		writeJSON(w, 200, s.fileJSON(rec, f))
@@ -356,6 +419,76 @@ func (s *Server) draftFile(w http.ResponseWriter, r *http.Request, rec *record, 
 	default:
 		jsonError(w, 404, "Not found.")
 	}
+}
+
+// partUpload stores one part of a multipart (`M`) file. Non-final parts
+// must match the declared part_size exactly (the documented local-storage
+// provider validation, D43).
+func (s *Server) partUpload(w http.ResponseWriter, r *http.Request, rec *record, key, partStr string) {
+	f, ok := rec.files[key]
+	if !ok || f.transfer != "M" {
+		jsonError(w, 404, "Not found.")
+		return
+	}
+	part, err := strconv.Atoi(partStr)
+	if err != nil || part < 1 || part > f.parts {
+		jsonError(w, 404, "Not found.")
+		return
+	}
+	if s.FailPart != nil {
+		if n, hit := s.FailPart[key]; hit && n == part {
+			delete(s.FailPart, key)
+			jsonError(w, 500, "Injected part failure.")
+			return
+		}
+	}
+	data, err := io.ReadAll(r.Body)
+	if err != nil {
+		jsonError(w, 400, "Malformed request.")
+		return
+	}
+	want := f.partSize
+	if part == f.parts {
+		want = f.size - int64(f.parts-1)*f.partSize
+	}
+	if int64(len(data)) != want {
+		jsonError(w, 400, fmt.Sprintf("Part %d has unexpected size %d, expected %d.", part, len(data), want))
+		return
+	}
+	f.partData[part-1] = data
+	writeJSON(w, 200, s.fileJSON(rec, f))
+}
+
+// commitMultipart completes a multipart upload: every part must be present
+// (DOCUMENTED-only — the storage backend cannot complete with parts
+// missing), the bytes reassemble in part order, and the transfer type flips
+// to "L" as the documented provider does.
+func (s *Server) commitMultipart(w http.ResponseWriter, rec *record, f *file) {
+	var data []byte
+	for i, p := range f.partData {
+		if p == nil {
+			jsonError(w, 400, fmt.Sprintf("Part %d has not been uploaded yet.", i+1))
+			return
+		}
+		data = append(data, p...)
+	}
+	if int64(len(data)) != f.size {
+		jsonError(w, 400, "Uploaded parts do not add up to the declared file size.")
+		return
+	}
+	f.data = data
+	sum := md5.Sum(f.data)
+	f.md5hex = hex.EncodeToString(sum[:])
+	if s.AsyncMultipartChecksum {
+		// The provider stores the multipart ETag placeholder and recomputes
+		// the real checksum in a background task (DOCUMENTED-only, D44).
+		f.checksum = fmt.Sprintf("multipart:%s-%d", f.md5hex[:8], f.partSize)
+	} else {
+		f.checksum = "md5:" + f.md5hex
+	}
+	f.committed = true
+	f.transfer = "L"
+	writeJSON(w, 200, s.fileJSON(rec, f))
 }
 
 func (s *Server) publish(w http.ResponseWriter, rec *record) {
@@ -426,7 +559,7 @@ func (s *Server) filesImport(w http.ResponseWriter, rec *record) {
 	}
 	for _, k := range prev.fileOrder {
 		pf := prev.files[k]
-		rec.files[k] = &file{key: k, data: pf.data, committed: true, md5hex: pf.md5hex, transfer: "L", size: pf.size}
+		rec.files[k] = &file{key: k, data: pf.data, committed: true, md5hex: pf.md5hex, checksum: "md5:" + pf.md5hex, transfer: "L", size: pf.size}
 		rec.fileOrder = append(rec.fileOrder, k)
 	}
 	writeJSON(w, 201, s.filesJSON(rec))
@@ -579,13 +712,18 @@ func (s *Server) fileJSON(rec *record, f *file) map[string]any {
 		},
 	}
 	if f.committed {
-		j["checksum"] = "md5:" + f.md5hex
+		j["checksum"] = f.checksum
 		j["size"] = f.size
 	}
 	if f.transfer == "M" {
+		// Fixture 39: per-part upload URLs with ~14-day expirations.
 		var parts []any
 		for i := 1; i <= f.parts; i++ {
-			parts = append(parts, map[string]any{"part": i, "url": self + "/content/" + strconv.Itoa(i)})
+			parts = append(parts, map[string]any{
+				"part":       i,
+				"url":        self + "/content/" + strconv.Itoa(i),
+				"expiration": "2026-08-24T23:38:00.765560+00:00",
+			})
 		}
 		j["links"].(map[string]any)["parts"] = parts
 	}
