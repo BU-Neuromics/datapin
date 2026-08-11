@@ -294,3 +294,23 @@ func TestStatus_DatasetRows(t *testing.T) {
 		t.Errorf("want AHEAD exit 1, got code=%d:\n%s", code, stdout)
 	}
 }
+
+func TestOpen_DatasetRecordURL(t *testing.T) {
+	e := newInvenioEnv(t)
+	e.setupDataset(t)
+	mustPublish(t, e, "counts")
+
+	stdout, stderr, code := e.run("open", "counts", "--output=json")
+	if code != 0 {
+		t.Fatalf("open: code=%d %s", code, stderr)
+	}
+	var res struct {
+		URL string `json:"url"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &res); err != nil {
+		t.Fatalf("open JSON: %v\n%s", err, stdout)
+	}
+	if !strings.Contains(res.URL, "/records/") || !strings.HasPrefix(res.URL, e.srv.URL()) {
+		t.Errorf("open URL = %q", res.URL)
+	}
+}

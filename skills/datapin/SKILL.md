@@ -154,6 +154,7 @@ transfers. Every publish prints the DOI and a paste-ready citation.
 datapin publish [<slug>] [--dry-run] [--yes] [--force] [--reserve] [--output=json]
 datapin versions <slug>                  # archive version chain with DOIs
 datapin pull <slug> [--latest]           # fetch published bytes (pinned version; --latest re-pins)
+datapin open <slug>                      # record landing page on the archive (browser)
 ```
 
 - `--reserve` uploads and reserves the DOI but does NOT publish — the DOI

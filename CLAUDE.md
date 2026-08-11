@@ -79,6 +79,71 @@ adapter interface, workspace vs archive remotes, Zenodo/InvenioRDM) is in
 [`docs/reboot-plan.md`](./docs/reboot-plan.md); operational decisions in
 [`docs/datapin-handoff.md`](./docs/datapin-handoff.md).
 
+## Archive publication (datasets → Zenodo/InvenioRDM)
+
+The FAIR-publication side added in the reboot (plan §4; decisions D11–D27
+in `docs/decisions.md`). OSF workspace sync above is untouched (D12).
+
+**Packages:**
+
+- `internal/backend` — the adapter interface archive repositories
+  implement: Caps, draft lifecycle (create/upload/commit/publish/discard),
+  versions, typed `ValidationError` (the InvenioRDM `{status, message,
+  errors[]}` shape) and `NotFoundError`.
+- `internal/backend/invenio` — the Zenodo/InvenioRDM driver. Key rules:
+  three-step upload (register → PUT content → commit) with server-checksum
+  verification; DOIs read defensively from both legacy and RDM response
+  shapes (D19); publish is never blind-retried on 5xx — it reconciles by
+  re-GET because publish can 504 while succeeding (zenodo#2131, D18);
+  download verification uses the `oc-checksum` header, whose MD5 hex
+  strips leading zeros (left-pad to 32 before comparing).
+- `internal/httpx` — shared bounded retry: Retry-After honored exactly,
+  `X-RateLimit-Reset` fallback, waits past 30s declined (not truncated),
+  retry headers consulted only on retryable statuses (Zenodo sends
+  `retry-after` on 200s — D15); `OnlyRetry429` marks non-idempotent
+  requests.
+- `internal/testutil/fakeinvenio` — hermetic InvenioRDM fake encoding the
+  Phase 0 spike findings (`docs/zenodo-notes.md`, fixtures under its
+  `fixtures/`): hybrid response shapes, idempotent `POST /versions`,
+  all-or-nothing files-import on an empty draft, atomic 100-file cap at
+  registration, empty files accepted, publish-twice → 404.
+- `internal/meta` — metadata validation (DataCite floor, embedded SPDX id
+  list, ORCID ISO 7064 checksums, DataCite relationTypes, NC/ND warnings),
+  Data Package v2 + RO-Crate 1.2 serializers, DOI content-negotiation
+  citations, F-UJI client.
+- `internal/site` — pure-Go goldmark site generator (GFM + frontmatter,
+  raw HTML escaped), embedded theme, dataset landing pages with
+  schema.org JSON-LD, orphan-commit gh-pages deploy + Pages REST
+  enablement.
+
+**Manifest schema 2** (additive — D13): `[[datasets]]` groups files into
+one publishable record (slug, `record`/`concept`/DOI pins, `version`,
+metadata block, files with flat keys defaulting to the local basename);
+`[site]` + `[[site.pages]]` drive the generated site. `[[files]]`/
+`[[wikis]]` keep their OSF semantics unchanged.
+
+**Commands:** `remote add/ls/rm` (named archive remotes in config.toml;
+per-remote tokens via `DATAPIN_TOKEN_<NAME>` > keychain >
+`~/.config/datapin/tokens/<name>`), `publish [<slug>]` (plan → loud
+PUBLIC/PERMANENT confirm → transaction → re-pin → DOI + citation;
+`--reserve`, `--dry-run`, `--force`; `--yes` mandatory in JSON mode),
+`versions <slug>` / `pull <slug> [--latest]` / `open <slug>` (bare-word
+dataset dispatch alongside the OSF `project:path` forms), dataset rows in
+`status`, `check [--fair]`, `export`, `cite`, `site build/preview/publish`.
+
+**The publish transaction** (cmd/publish.go): open draft (create or
+idempotent new-version) → files-import previous version → per-key plan
+from the pure `planDataset` (upload/replace/keep/remove) → refresh
+metadata → clear pending entries → publish → atomic manifest re-pin.
+Failures before publish discard the draft (except `--reserve`); metadata
+completeness is enforced only at this boundary (`publishPreflight` →
+`meta.Check`).
+
+**Backward compat with gosf** (kept until migration completes): legacy
+`.gosf/gosf.toml` loads read-only (`Save` refuses with a migration hint),
+`~/.config/gosf` stores are read-fallbacks, `GOSF_*` env vars are accepted
+with deprecation warnings (`internal/env`).
+
 ## Project structure
 
 ```
@@ -573,8 +638,13 @@ update the skill in the same PR.
 1. **Unit** — pure functions and HTTP clients against `httptest` (`go test ./...`).
 2. **Integration** (`-tags integration`, `integration/`) — the built binary driven
    against the in-process `fakeosf` server. Fast, hermetic, runs in CI.
-3. **Live** (`-tags live`, `integration/live/`) — the built binary against a **real**
-   private OSF project. Compiled only under `-tags live`; each test skips unless
+3. **Live** (`-tags live`) — `integration/live/` runs against a **real**
+   private OSF project; `integration/livezenodo/` runs the publish
+   lifecycle against **sandbox.zenodo.org** (skips without
+   `ZENODO_SANDBOX_TOKEN`; wired into live.yml). The Zenodo live tier has
+   already caught a real divergence (zero-stripped oc-checksum MD5s) —
+   it is the tier that keeps fakeinvenio honest.
+   The OSF live tier details: Compiled only under `-tags live`; each test skips unless
    `OSF_TEST_TOKEN` + `OSF_TEST_PROJECT` (+ optional `OSF_TEST_COMPONENT`) are set.
    Tests write under a unique `/datapin-ci-<nano>-<pid>/` folder and delete it on
    cleanup, so they are repeatable and leave no residue. Run privately:
