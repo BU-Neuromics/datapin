@@ -18,3 +18,11 @@ review; none are load-bearing beyond the code that cites them.
 | D18 | **Publish reconciles inside the driver.** On a 5xx/timeout from the publish action, `invenio.Publish` re-GETs the record and returns success iff `status == published` (spike: publish-twice → 404, publish can 504 while succeeding). Callers see one clean result. | Centralizes the trickiest recovery rule so every command gets it right. |
 | D19 | **Zenodo legacy/RDM hybrid responses are read defensively**: DOIs read from `pids.doi.identifier` first, then top-level `doi`/`conceptdoi`. | Spike finding: sandbox publish/draft responses are legacy-shaped. |
 | D20 | **Default license suggestion: CC0-1.0** (the open item in handoff §2), presented as a suggestion with CC-BY-4.0 as the named alternative; `check` warns on NC/ND. | Plan §2.2 already leans CC0 for data (Dryad precedent, attribution stacking); wording-only decision, easily reversed. |
+
+## Phase 3 additions
+
+| # | Decision | Rationale |
+|---|---|---|
+| D25 | **Site pipeline ships goldmark + GFM + frontmatter only**; chroma highlighting, mermaid, and KaTeX (named in plan §2.6) are deferred as theme enhancements. Raw HTML in markdown is escaped by default. | Keeps the dependency and vendoring surface small for the first cut; the pipeline structure (pure stages, embedded theme) is what D8 fixes, and extensions bolt on without redesign. |
+| D26 | **`site build` is fully offline** — landing-page citations render locally from manifest metadata; DOI content negotiation stays in `datapin cite` (live fetch). The plan's cached content-negotiation for pages is an enhancement. | Deterministic, network-free builds (CI-friendly); sandbox DOIs never resolve anyway, so the fetch path would be dead in every rehearsal. |
+| D27 | **`site publish` works without a token**: push relies on the user's git credential helper, and first-run Pages enablement is skipped with a note when no token is found (--github-token → GITHUB_TOKEN → GH_TOKEN → `gh auth token`). | Never block a deploy on the optional REST call; the ladder matches plan §2.6. |

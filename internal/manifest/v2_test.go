@@ -255,3 +255,86 @@ func TestFindDataset(t *testing.T) {
 		t.Errorf("FindDataset(nope) = %+v, want nil", d)
 	}
 }
+
+const siteTOML = `
+[project]
+id = "abc12"
+
+[site]
+title    = "Cortical RNA-seq"
+base_url = "https://bu-neuromics.github.io/cortical"
+deploy   = "gh-pages"
+repo     = "BU-Neuromics/cortical"
+
+[[site.pages]]
+local = "docs/index.md"
+slug  = "index"
+[[site.pages]]
+local = "docs/methods.md"
+slug  = "methods"
+`
+
+func TestLoadV2_SiteConfig(t *testing.T) {
+	m, err := manifest.Load(writeManifest(t, siteTOML))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if m.Site.Title != "Cortical RNA-seq" || m.Site.Deploy != "gh-pages" || m.Site.Repo != "BU-Neuromics/cortical" {
+		t.Errorf("site = %+v", m.Site)
+	}
+	if len(m.Site.Pages) != 2 || m.Site.Pages[1].Slug != "methods" {
+		t.Errorf("pages = %+v", m.Site.Pages)
+	}
+}
+
+func TestLoadV2_SitePageSlugDefaultsToBasename(t *testing.T) {
+	toml := `
+[project]
+id = "abc12"
+[site]
+title = "T"
+[[site.pages]]
+local = "docs/methods.md"
+`
+	m, err := manifest.Load(writeManifest(t, toml))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if m.Site.Pages[0].Slug != "methods" {
+		t.Errorf("slug = %q, want basename without extension", m.Site.Pages[0].Slug)
+	}
+}
+
+func TestValidateV2_SitePages(t *testing.T) {
+	dupSlug := `
+[project]
+id = "abc12"
+[site]
+title = "T"
+[[site.pages]]
+local = "docs/a.md"
+slug = "x"
+[[site.pages]]
+local = "docs/b.md"
+slug = "x"
+`
+	if _, err := manifest.Load(writeManifest(t, dupSlug)); err == nil {
+		t.Error("duplicate page slug must be rejected")
+	}
+	dupLocal := `
+[project]
+id = "abc12"
+[[files]]
+local = "docs/a.md"
+remote = "/a.md"
+version = 1
+md5 = "aa"
+[site]
+title = "T"
+[[site.pages]]
+local = "docs/a.md"
+`
+	if _, err := manifest.Load(writeManifest(t, dupLocal)); err == nil {
+		t.Error("page local colliding with a files entry must be rejected")
+	}
+}

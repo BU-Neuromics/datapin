@@ -22,6 +22,26 @@ type Manifest struct {
 	Files    []Entry       `toml:"files"`
 	Wikis    []WikiEntry   `toml:"wikis,omitempty"`
 	Datasets []Dataset     `toml:"datasets,omitempty"`
+	Site     SiteConfig    `toml:"site,omitempty"`
+}
+
+// SiteConfig drives the static documentation site (plan §4.5): markdown
+// pages plus generated dataset landing pages, deployed to GitHub Pages.
+type SiteConfig struct {
+	Title string `toml:"title,omitempty"`
+	// BaseURL is the published site root (for sitemap/JSON-LD absolute
+	// URLs), e.g. https://org.github.io/repo.
+	BaseURL string `toml:"base_url,omitempty"`
+	// Deploy is "gh-pages" (orphan-commit force-push) or "dir".
+	Deploy string     `toml:"deploy,omitempty"`
+	Repo   string     `toml:"repo,omitempty"` // owner/repo for gh-pages; default: origin
+	Pages  []SitePage `toml:"pages,omitempty"`
+}
+
+// SitePage is one local markdown file rendered into the site.
+type SitePage struct {
+	Local string `toml:"local"`
+	Slug  string `toml:"slug,omitempty"` // defaults to the basename sans extension
 }
 
 // ProjectConfig holds the default project GUID and the default archive
@@ -198,6 +218,13 @@ func Load(path string) (*Manifest, error) {
 			if m.Datasets[di].Files[fi].Key == "" {
 				m.Datasets[di].Files[fi].Key = filepath.Base(m.Datasets[di].Files[fi].Local)
 			}
+		}
+	}
+	// Same convenience for site pages: docs/methods.md → slug "methods".
+	for pi := range m.Site.Pages {
+		if m.Site.Pages[pi].Slug == "" {
+			base := filepath.Base(m.Site.Pages[pi].Local)
+			m.Site.Pages[pi].Slug = strings.TrimSuffix(base, filepath.Ext(base))
 		}
 	}
 
@@ -427,6 +454,21 @@ func validate(m *Manifest) error {
 			}
 			seenKey[f.Key] = true
 		}
+	}
+
+	seenPageSlug := make(map[string]bool)
+	for i, p := range m.Site.Pages {
+		if p.Local == "" {
+			return fmt.Errorf("site.pages[%d]: local path cannot be blank", i)
+		}
+		if seenLocal[p.Local] {
+			return fmt.Errorf("duplicate local path %q in manifest", p.Local)
+		}
+		seenLocal[p.Local] = true
+		if seenPageSlug[p.Slug] {
+			return fmt.Errorf("duplicate site page slug %q", p.Slug)
+		}
+		seenPageSlug[p.Slug] = true
 	}
 	return nil
 }
