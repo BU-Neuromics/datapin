@@ -10,19 +10,51 @@ the cluster, `datapin push` the results, `git clone` the repo anywhere, and
 `datapin pull` reproduces them — every file pinned to an exact version and
 MD5.
 
-Today datapin syncs against the
-[Open Science Framework](https://osf.io) (OSF) — it began life as `gosf`, a
-maintained replacement for the Python `osfclient`. It is growing into a
-general-purpose **FAIR data publication tool**: the same manifest-driven
-workflow, with archival, DOI-minting backends (Zenodo first) and generated
-dataset landing pages. See [Where datapin is going](#where-datapin-is-going).
+Beyond workspace sync (against the [Open Science Framework](https://osf.io) —
+datapin began life as `gosf`, a maintained replacement for the Python
+`osfclient`), datapin is a **FAIR data publication tool**: group files into
+datasets and `datapin publish` them to [Zenodo](https://zenodo.org) (or any
+InvenioRDM instance) as immutable, versioned, DOI-carrying records — with
+metadata linting, standard metadata exports, citations, and a generated
+static documentation site with citation-ready dataset landing pages.
 
 ```console
-$ datapin pull abc12:/data/results.csv
-$ datapin push ./figures/ abc12:/manuscript/figures/
-$ datapin ls abc12:/data
-$ datapin wiki push docs/home.md abc12:home
+$ datapin publish counts           # dataset → Zenodo record + DOI + citation
+$ datapin check --fair             # DataCite/SPDX/ORCID lint + F-UJI score
+$ datapin site publish             # dataset landing pages → GitHub Pages
+$ datapin pull abc12:/data/results.csv     # OSF workspace sync, as ever
 ```
+
+## Publish a dataset in five minutes
+
+```console
+$ datapin remote add https://sandbox.zenodo.org --name sandbox   # rehearse on sandbox first!
+$ $EDITOR .datapin/datapin.toml    # declare a [[datasets]] block (below)
+$ datapin check                    # metadata lint: what publish would refuse
+$ datapin publish counts           # plan → confirm → transaction → DOI + citation
+$ datapin versions counts          # the version chain, DOIs, and your pin
+```
+
+```toml
+[project]
+default_archive = "sandbox"
+
+[[datasets]]
+slug = "counts"
+  [datasets.metadata]
+  title   = "Aligned RNA-seq count matrices"
+  license = "CC0-1.0"
+  [[datasets.metadata.creators]]
+  name  = "Labadorf, Adam"
+  orcid = "0000-0002-…"
+  [[datasets.files]]
+  local = "results/counts.h5"
+```
+
+Publishing again after editing files opens a new version: unchanged files are
+carried over server-side (no re-upload), only changed content transfers, and
+a fresh version DOI is minted under the stable concept DOI. `datapin pull
+counts` restores the pinned bytes anywhere the repo is cloned.
 
 ## Features
 
@@ -45,25 +77,35 @@ $ datapin wiki push docs/home.md abc12:home
 - **Project wikis** — read, write, and sync a project's versioned markdown wiki
   pages (`datapin wiki`), including manifest-driven sync of local `.md` files.
 
-## Where datapin is going
+## FAIR data publication
 
 datapin is the reboot of [`gosf`](https://github.com/BU-Neuromics/gosf) as a
-multi-backend FAIR data publication tool. The plan, in short:
+multi-backend FAIR data publication tool. What ships today:
 
-- **Workspace remotes** (OSF today; S3-compatible and SFTP later) keep the
-  current mutable push/pull/sync workflow for intermediate results — no DOIs,
-  no metadata ceremony.
-- **Archive backends** (Zenodo/InvenioRDM first, then Figshare and Dataverse)
-  add `datapin publish`: promote a pinned dataset to an immutable, versioned,
-  DOI-carrying record with DataCite-complete metadata.
-- **A generated static site** replaces the OSF wiki: citation-ready dataset
-  landing pages with checksums, version history, and schema.org JSON-LD,
-  deployed to GitHub Pages.
+- **Workspace remotes** (OSF; S3-compatible and SFTP planned) keep the
+  mutable push/pull/sync workflow for intermediate results — no DOIs, no
+  metadata ceremony.
+- **Archive backends** (Zenodo and any InvenioRDM instance; Figshare and
+  Dataverse planned): `datapin publish` promotes a dataset to an immutable,
+  versioned, DOI-carrying record. `datapin check` lints metadata against the
+  DataCite floor (SPDX licenses, ORCID checksums, relation types) and
+  `check --fair` runs an F-UJI FAIR assessment. `datapin export` writes
+  `datapackage.json` / `ro-crate-metadata.json`; `datapin cite` fetches
+  formatted citations via DOI content negotiation.
+- **A generated static site** replaces the OSF wiki: `datapin site` renders
+  markdown pages plus citation-ready dataset landing pages (checksums,
+  DOI links, schema.org JSON-LD) and deploys to GitHub Pages as a single
+  orphan commit.
+
+Rehearse every publish against [sandbox.zenodo.org](https://sandbox.zenodo.org)
+(`datapin remote add https://sandbox.zenodo.org --name sandbox`) — publishing
+to production Zenodo is permanent and public, and its DOIs resolve forever.
 
 The full architecture and phased roadmap live in
 [`docs/reboot-plan.md`](./docs/reboot-plan.md); operational decisions are in
-[`docs/datapin-handoff.md`](./docs/datapin-handoff.md). Releases restart at
-`v0.1.0` under the datapin name (gosf's history is preserved in this repo).
+[`docs/datapin-handoff.md`](./docs/datapin-handoff.md) and
+[`docs/decisions.md`](./docs/decisions.md). Verified Zenodo API behaviors:
+[`docs/zenodo-notes.md`](./docs/zenodo-notes.md).
 
 ### Migrating from gosf
 

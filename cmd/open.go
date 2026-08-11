@@ -27,6 +27,13 @@ Examples:
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// A bare argument naming a manifest dataset opens its published
+		// record's landing page on the archive.
+		if !strings.Contains(args[0], ":") {
+			if handled, err := runDatasetOpen(args[0]); handled {
+				return err
+			}
+		}
 		target, err := resolver.ParseTarget(args[0])
 		if err != nil {
 			return err
