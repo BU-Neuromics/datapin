@@ -6,7 +6,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/BU-Neuromics/datapin/internal/backend/invenio"
 	"github.com/BU-Neuromics/datapin/internal/config"
 	"github.com/BU-Neuromics/datapin/internal/log"
 	"github.com/BU-Neuromics/datapin/internal/output"
@@ -53,17 +52,17 @@ accounts and tokens — register them as two remotes:
 		if name == "" {
 			return fmt.Errorf("--name is required (e.g. --name sandbox)")
 		}
-		if remoteAddKind != "invenio" {
-			return fmt.Errorf("unsupported remote kind %q — only \"invenio\" (Zenodo/InvenioRDM) is available", remoteAddKind)
-		}
-
-		bk, err := invenio.New(url, remoteAddToken)
+		bk, err := newArchiveBackend(config.Remote{Name: name, Kind: remoteAddKind, URL: url}, remoteAddToken)
 		if err != nil {
 			return err
 		}
 		if !remoteAddNoVerify {
 			log.Infof("probing %s", url)
-			if err := bk.Ping(cmd.Context()); err != nil {
+			p, ok := bk.(pingable)
+			if !ok {
+				return fmt.Errorf("kind %q cannot be probed", remoteAddKind)
+			}
+			if err := p.Ping(cmd.Context()); err != nil {
 				return fmt.Errorf("%w\n(use --no-verify to add it anyway)", err)
 			}
 		}
@@ -180,7 +179,7 @@ func envSuffix(name string) string {
 
 func init() {
 	remoteAddCmd.Flags().StringVar(&remoteAddName, "name", "", "Name for the remote (required)")
-	remoteAddCmd.Flags().StringVar(&remoteAddKind, "kind", "invenio", "Backend kind (invenio)")
+	remoteAddCmd.Flags().StringVar(&remoteAddKind, "kind", "invenio", "Backend kind (invenio, figshare, dataverse)")
 	remoteAddCmd.Flags().BoolVar(&remoteAddNoVerify, "no-verify", false, "Skip probing the URL before adding")
 	remoteAddCmd.Flags().StringVar(&remoteAddToken, "token-value", "", "API token to store for this remote")
 	remoteAddCmd.Flags().BoolVar(&noKeychain, "no-keychain", false, "Store the token in a file instead of the OS keychain")

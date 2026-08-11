@@ -63,6 +63,7 @@ func New(baseURL, token string, opts ...Option) (*Client, error) {
 func zenodoCaps(host string) backend.Caps {
 	return backend.Caps{
 		MintsDOI:          true,
+		PerVersionDOI:     true,
 		ReserveDOI:        true,
 		PIDKind:           "doi",
 		SyncPublish:       true,

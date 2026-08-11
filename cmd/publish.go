@@ -242,21 +242,25 @@ func publishTransaction(ctx context.Context, bk backend.Backend, ds *manifest.Da
 		if err != nil {
 			return backend.PublishResult{}, "", 0, err
 		}
-		// files-import needs an empty draft. A draft left over from a
-		// crashed run may already hold files — clear and start fresh so
-		// the transaction is re-runnable.
-		if err := bk.ImportPreviousFiles(ctx, draft); err != nil {
-			existing, listErr := bk.ListDraftFiles(ctx, draft)
-			if listErr != nil {
-				return backend.PublishResult{}, "", 0, err
-			}
-			for _, f := range existing {
-				if delErr := bk.DeleteDraftFile(ctx, draft, f.Key); delErr != nil {
-					return backend.PublishResult{}, "", 0, fmt.Errorf("clearing stale draft file %s: %w", f.Key, delErr)
-				}
-			}
+		// Backends with files-import (InvenioRDM) need an empty draft: a
+		// draft left over from a crashed run may already hold files —
+		// clear and start fresh so the transaction is re-runnable.
+		// Backends without it (Figshare) carry the previous version's
+		// files in the draft already; the per-key plan converges either way.
+		if bk.Capabilities().ImportsPrevious {
 			if err := bk.ImportPreviousFiles(ctx, draft); err != nil {
-				return backend.PublishResult{}, "", 0, fmt.Errorf("importing previous version's files: %w", err)
+				existing, listErr := bk.ListDraftFiles(ctx, draft)
+				if listErr != nil {
+					return backend.PublishResult{}, "", 0, err
+				}
+				for _, f := range existing {
+					if delErr := bk.DeleteDraftFile(ctx, draft, f.Key); delErr != nil {
+						return backend.PublishResult{}, "", 0, fmt.Errorf("clearing stale draft file %s: %w", f.Key, delErr)
+					}
+				}
+				if err := bk.ImportPreviousFiles(ctx, draft); err != nil {
+					return backend.PublishResult{}, "", 0, fmt.Errorf("importing previous version's files: %w", err)
+				}
 			}
 		}
 	} else {

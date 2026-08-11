@@ -130,13 +130,16 @@ distinct from the OSF workspace project). Stored in
 var → keychain → token file.
 
 ```bash
-datapin remote add <url> --name <name> [--kind invenio] [--token-value <tok>] [--no-verify] [--no-keychain]
+datapin remote add <url> --name <name> [--kind invenio|figshare|dataverse] [--token-value <tok>] [--no-verify] [--no-keychain]
 datapin remote ls [--output=json]        # list remotes and whether each has a token
 datapin remote rm <name>                 # remove a remote and its stored token
 ```
 
-`remote add` probes the URL to confirm it answers like an InvenioRDM
-instance (`--no-verify` skips the probe). Zenodo sandbox
+Kinds: `invenio` (Zenodo and any InvenioRDM instance), `figshare`
+(per-version .vN DOIs, no files-import), `dataverse` (one DOI for all
+versions; a collection alias may ride on the URL as
+https://host/dataverse/<alias>, default root). `remote add` probes the
+URL to confirm it answers like the expected API (`--no-verify` skips). Zenodo sandbox
 (https://sandbox.zenodo.org) and production (https://zenodo.org) are
 separate services with separate accounts and tokens — add both as remotes
 when rehearsing a publish. Sandbox DOIs (prefix `10.5072`) do not resolve.
