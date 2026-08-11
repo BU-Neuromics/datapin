@@ -242,4 +242,36 @@ func TestDo_UnrewindableBodyIsNotRetried(t *testing.T) {
 	}
 }
 
+func TestDo_OnlyRetry429SkipsGatewayRetries(t *testing.T) {
+	// Non-idempotent actions (publish) recover from 5xx by reconciling,
+	// never by blind retry — but throttling is still absorbed.
+	d := &scriptedDoer{responses: []*http.Response{
+		resp(504, map[string]string{"Retry-After": "1"}),
+		resp(200, nil),
+	}}
+	var slept []time.Duration
+	c := newClient(d, &slept, time.Now())
+
+	r, err := c.Do(httpx.OnlyRetry429(get(t)))
+	if err != nil {
+		t.Fatalf("Do: %v", err)
+	}
+	if r.StatusCode != 504 || len(d.requests) != 1 {
+		t.Errorf("504 under OnlyRetry429: status=%d requests=%d, want 504 after 1 request", r.StatusCode, len(d.requests))
+	}
+
+	d2 := &scriptedDoer{responses: []*http.Response{
+		resp(429, map[string]string{"Retry-After": "1"}),
+		resp(200, nil),
+	}}
+	c2 := newClient(d2, &slept, time.Now())
+	r2, err := c2.Do(httpx.OnlyRetry429(get(t)))
+	if err != nil {
+		t.Fatalf("Do: %v", err)
+	}
+	if r2.StatusCode != 200 || len(d2.requests) != 2 {
+		t.Errorf("429 under OnlyRetry429: status=%d requests=%d, want retried to 200", r2.StatusCode, len(d2.requests))
+	}
+}
+
 var _ = fmt.Sprintf // keep fmt imported if assertions change

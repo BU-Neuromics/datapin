@@ -206,6 +206,12 @@ func (c *Client) newRequest(ctx context.Context, method, path string, body []byt
 // nil). Non-2xx responses map to typed errors: 404 → NotFoundError,
 // validation 400s → ValidationError.
 func (c *Client) doJSON(ctx context.Context, method, path string, body any, out any) error {
+	return c.doJSONMarked(ctx, method, path, body, out, nil)
+}
+
+// doJSONMarked is doJSON with an optional request marker (e.g.
+// httpx.OnlyRetry429 for non-idempotent actions).
+func (c *Client) doJSONMarked(ctx context.Context, method, path string, body any, out any, mark func(*http.Request) *http.Request) error {
 	var raw []byte
 	if body != nil {
 		var err error
@@ -217,6 +223,9 @@ func (c *Client) doJSON(ctx context.Context, method, path string, body any, out 
 	req, err := c.newRequest(ctx, method, path, raw, "application/json")
 	if err != nil {
 		return err
+	}
+	if mark != nil {
+		req = mark(req)
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
@@ -419,7 +428,9 @@ func (c *Client) ReserveDOI(ctx context.Context, id backend.DraftID) (string, er
 // because the draft is gone.
 func (c *Client) Publish(ctx context.Context, id backend.DraftID) (backend.PublishResult, error) {
 	var rec recordJSON
-	err := c.doJSON(ctx, "POST", "/api/records/"+string(id)+"/draft/actions/publish", nil, &rec)
+	// OnlyRetry429: a publish 5xx may have succeeded server-side; the
+	// recovery is the reconcile below, never a blind retry.
+	err := c.doJSONMarked(ctx, "POST", "/api/records/"+string(id)+"/draft/actions/publish", nil, &rec, httpx.OnlyRetry429)
 	if err == nil {
 		return publishResult(rec), nil
 	}

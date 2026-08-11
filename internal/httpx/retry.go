@@ -29,6 +29,16 @@ type Doer interface {
 	Do(*http.Request) (*http.Response, error)
 }
 
+type onlyRetry429Key struct{}
+
+// OnlyRetry429 marks req so that only 429s are retried. Non-idempotent
+// actions (publish) must never be blind-retried on gateway errors — they
+// can succeed server-side while failing at the gateway (zenodo#2131); the
+// caller reconciles instead.
+func OnlyRetry429(req *http.Request) *http.Request {
+	return req.WithContext(context.WithValue(req.Context(), onlyRetry429Key{}, true))
+}
+
 // RetryClient retries throttled/transient responses with bounded waits.
 type RetryClient struct {
 	doer  Doer
@@ -63,12 +73,16 @@ func New(doer Doer, opts ...Option) *RetryClient {
 // is set (http.NewRequest sets it for common in-memory body types); a
 // streaming body cannot be replayed, so its response is returned as-is.
 func (c *RetryClient) Do(req *http.Request) (*http.Response, error) {
+	only429, _ := req.Context().Value(onlyRetry429Key{}).(bool)
 	for attempt := 0; ; attempt++ {
 		resp, err := c.doer.Do(req)
 		if err != nil {
 			return nil, err
 		}
 		if !isRetryableStatus(resp.StatusCode) || attempt >= maxRetries {
+			return resp, nil
+		}
+		if only429 && resp.StatusCode != http.StatusTooManyRequests {
 			return resp, nil
 		}
 		if req.Body != nil && req.GetBody == nil {

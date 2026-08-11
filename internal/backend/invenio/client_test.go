@@ -270,6 +270,20 @@ func TestPublish_ReconcilesAfter5xx(t *testing.T) {
 	if res.DOI == "" {
 		t.Errorf("reconciled publish must carry the DOI, got %+v", res)
 	}
+
+	// Regression: the publish POST must never be blind-retried on a 5xx —
+	// reconcile-by-GET is the only recovery (plan §2.4). A retried publish
+	// also honored the response's ever-present Retry-After (9s) and made
+	// this test take 9 wall-clock seconds.
+	publishPosts := 0
+	for _, req := range srv.ListRequests() {
+		if strings.HasSuffix(req, "/actions/publish") && strings.HasPrefix(req, "POST") {
+			publishPosts++
+		}
+	}
+	if publishPosts != 1 {
+		t.Errorf("publish POSTs = %d, want exactly 1 (no blind retry)", publishPosts)
+	}
 }
 
 func TestDiscardLeavesNoTrace(t *testing.T) {
