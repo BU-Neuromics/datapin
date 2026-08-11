@@ -46,6 +46,7 @@ datapin open     <project>[:<path>]
 datapin add      <local-path> <project>:<remote-path>
 datapin status
 datapin sync
+datapin migrate  [<osf-guid>] [dest]
 datapin wiki ls       <project>
 datapin wiki get      <project>[:<page>] [dest]
 datapin wiki push     <src.md> <project>[:<page>]
@@ -179,6 +180,26 @@ kind implies role (D33).
 `~/.config/gosf` stores are read-fallbacks, `GOSF_*` env vars are accepted
 with deprecation warnings (`internal/env`).
 
+## OSF exit ramp (`datapin migrate`, issue #30; D43–D48)
+
+OSF announced sunsetting its projects service; datapin's OSF support is
+**frozen** and `migrate` (cmd/migrate.go) is the exit ramp — the last consumer
+of `internal/client`/`internal/resolver`/the wiki client, all deleted together
+at the next major. **GUID mode** (`migrate <guid> [dest]`) exports a node:
+files MD5-verified into dest, wikis to `docs/<page>.md`, node metadata →
+dataset skeleton (contributors → name-only creators; license/contact_email are
+literal `TODO` markers that D37's publish gate refuses; `IsDerivedFrom` →
+osf.io URL), fresh manifest + `MIGRATED.md`; `--components` recurses the
+component tree as per-component datasets. **Manifest mode** (no GUID) fetches
+MISSING/BEHIND/REMOTE_NEWER via the shared scan/gate machinery (DIVERGED fails
+hard pre-flight), groups `[[files]]` into `[[datasets]]` (per top-level dir;
+`--dataset slug=glob` overrides), converts `[[wikis]]` to site pages, and
+rewrites the manifest with the OSF sections removed. Re-runs are idempotent
+(MD5 skip + per-slug metadata/pin preservation). JSON mode never prompts and
+exits 1 while metadata TODOs remain. Pure helpers live in
+cmd/migrate_helpers.go; fakeosf serves tags/contributors/children for the
+integration tier.
+
 ## Project structure
 
 ```
@@ -197,6 +218,8 @@ datapin/
 │   ├── add.go               # datapin add — add entry to .datapin/datapin.toml
 │   ├── status.go            # datapin status — show manifest sync status
 │   ├── sync.go              # datapin sync — push/pull; processPushEntry/processPullEntry gates
+│   ├── migrate.go           # datapin migrate — OSF exit ramp (GUID + manifest modes)
+│   ├── migrate_helpers.go   # pure migrate helpers (grouping, skeleton, TODOs, MIGRATED.md)
 │   ├── onboard.go           # datapin onboard — guided setup (auth → project → pick files)
 │   ├── wiki.go              # datapin wiki command group + shared helpers (parseWikiTarget, findWikiPage, friendlyWikiError)
 │   ├── wiki_ls.go           # datapin wiki ls

@@ -84,13 +84,25 @@ func (f *File) versionContent(ver int) []byte {
 }
 
 type fakeProject struct {
-	id          string
-	title       string
-	description string
-	category    string
-	root        []*File
-	byID        map[string]*File
-	byPath      map[string]*File
+	id           string
+	title        string
+	description  string
+	category     string
+	tags         []string
+	contributors []fakeContributor
+	children     []string // child component node IDs, in insertion order
+	root         []*File
+	byID         map[string]*File
+	byPath       map[string]*File
+}
+
+// fakeContributor is one contributor of a fake project. Names mirror the
+// embedded user resource real OSF serves on /v2/nodes/{id}/contributors/.
+type fakeContributor struct {
+	FullName      string
+	GivenName     string
+	FamilyName    string
+	Bibliographic bool
 }
 
 // MoveRecord describes one move/copy/rename action received by the server.
@@ -194,6 +206,44 @@ func (s *Server) AddProject(id, title string) {
 	s.projects[id] = &fakeProject{
 		id: id, title: title,
 		byID: make(map[string]*File), byPath: make(map[string]*File),
+	}
+}
+
+// SetProjectMeta sets a project's description and tags (served on GET
+// /v2/nodes/{id}/).
+func (s *Server) SetProjectMeta(id, description string, tags ...string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if proj := s.projects[id]; proj != nil {
+		proj.description = description
+		proj.tags = tags
+	}
+}
+
+// AddContributor registers a bibliographic contributor on a project, served
+// on GET /v2/nodes/{id}/contributors/ with the user resource embedded.
+func (s *Server) AddContributor(projectID, fullName, givenName, familyName string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if proj := s.projects[projectID]; proj != nil {
+		proj.contributors = append(proj.contributors, fakeContributor{
+			FullName: fullName, GivenName: givenName, FamilyName: familyName, Bibliographic: true,
+		})
+	}
+}
+
+// AddComponent registers childID as a component (child node) of parentID.
+// The component is a full project of its own — AddFile/AddWiki/etc. work on
+// it — and is additionally listed on GET /v2/nodes/{parent}/children/.
+func (s *Server) AddComponent(parentID, childID, title string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.projects[childID] = &fakeProject{
+		id: childID, title: title,
+		byID: make(map[string]*File), byPath: make(map[string]*File),
+	}
+	if parent := s.projects[parentID]; parent != nil {
+		parent.children = append(parent.children, childID)
 	}
 }
 
@@ -380,6 +430,10 @@ func (s *Server) handler(w http.ResponseWriter, r *http.Request) {
 		s.handleFileList(w, r)
 	case strings.HasPrefix(p, "/v2/nodes/") && strings.HasSuffix(p, "/wikis/"):
 		s.handleNodeWikis(w, r)
+	case r.Method == http.MethodGet && strings.HasPrefix(p, "/v2/nodes/") && strings.HasSuffix(p, "/contributors/"):
+		s.handleContributors(w, r)
+	case r.Method == http.MethodGet && strings.HasPrefix(p, "/v2/nodes/") && strings.HasSuffix(p, "/children/"):
+		s.handleChildren(w, r)
 	case strings.HasPrefix(p, "/v2/wikis/"):
 		s.handleWiki(w, r)
 	case (r.Method == http.MethodGet || r.Method == http.MethodPatch) && strings.HasPrefix(p, "/v2/nodes/"):
@@ -523,17 +577,97 @@ func (s *Server) handleNode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"data": map[string]any{
-			"id": proj.id,
-			"attributes": map[string]any{
-				"title":         proj.title,
-				"description":   proj.description,
-				"date_created":  "2024-01-01T00:00:00",
-				"date_modified": "2024-01-01T00:00:00",
-				"public":        true,
-				"category":      proj.category,
-			},
+		"data": nodeJSON(proj),
+	})
+}
+
+// nodeJSON renders a project as a JSON:API node resource.
+func nodeJSON(proj *fakeProject) map[string]any {
+	tags := proj.tags
+	if tags == nil {
+		tags = []string{}
+	}
+	return map[string]any{
+		"id": proj.id,
+		"attributes": map[string]any{
+			"title":         proj.title,
+			"description":   proj.description,
+			"date_created":  "2024-01-01T00:00:00",
+			"date_modified": "2024-01-01T00:00:00",
+			"public":        true,
+			"category":      proj.category,
+			"tags":          tags,
 		},
+	}
+}
+
+// handleContributors serves GET /v2/nodes/{id}/contributors/ with the user
+// resource embedded, as real OSF does.
+func (s *Server) handleContributors(w http.ResponseWriter, r *http.Request) {
+	nodeID := extractNodeID(r.URL.Path)
+	if s.forbid(w, nodeID) {
+		return
+	}
+	s.mu.Lock()
+	proj, ok := s.projects[nodeID]
+	if !ok {
+		s.mu.Unlock()
+		http.NotFound(w, r)
+		return
+	}
+	data := make([]map[string]any, 0, len(proj.contributors))
+	for i, c := range proj.contributors {
+		data = append(data, map[string]any{
+			"id":   fmt.Sprintf("%s-user%d", nodeID, i+1),
+			"type": "contributors",
+			"attributes": map[string]any{
+				"bibliographic": c.Bibliographic,
+				"index":         i,
+			},
+			"embeds": map[string]any{
+				"users": map[string]any{
+					"data": map[string]any{
+						"id": fmt.Sprintf("user%d", i+1),
+						"attributes": map[string]any{
+							"full_name":   c.FullName,
+							"given_name":  c.GivenName,
+							"family_name": c.FamilyName,
+						},
+					},
+				},
+			},
+		})
+	}
+	s.mu.Unlock()
+	writeJSON(w, http.StatusOK, map[string]any{
+		"data":  data,
+		"links": map[string]any{"next": nil},
+	})
+}
+
+// handleChildren serves GET /v2/nodes/{id}/children/ (direct components).
+func (s *Server) handleChildren(w http.ResponseWriter, r *http.Request) {
+	nodeID := extractNodeID(r.URL.Path)
+	if s.forbid(w, nodeID) {
+		return
+	}
+	s.mu.Lock()
+	proj, ok := s.projects[nodeID]
+	if !ok {
+		s.mu.Unlock()
+		http.NotFound(w, r)
+		return
+	}
+	data := make([]map[string]any, 0, len(proj.children))
+	for _, childID := range proj.children {
+		if child := s.projects[childID]; child != nil {
+			data = append(data, nodeJSON(child))
+		}
+	}
+	s.mu.Unlock()
+	writeJSON(w, http.StatusOK, map[string]any{
+		"data":  data,
+		"links": map[string]any{"next": nil},
 	})
 }
 

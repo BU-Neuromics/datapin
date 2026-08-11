@@ -1,6 +1,6 @@
 ---
 name: datapin
-description: "Use when working with the Open Science Framework (OSF) for research data management. Invoke when: the project contains a .datapin/datapin.toml manifest (or a legacy .gosf/gosf.toml from datapin's previous life as gosf); the user mentions OSF, osf.io, or osfclient; the task involves syncing, pushing, or pulling research data files with an OSF project; the task involves an OSF project wiki or its markdown pages; or you need to inspect, manage, or automate files stored in OSF Storage. Covers the full datapin CLI: manifest management (datapin init / add / status / sync), file transfer (datapin pull / push / rm), storage management (datapin mkdir / mv / cp), project navigation (datapin ls / info / projects / versions / open / set), project wikis (datapin wiki ls / get / push / rm / mv / versions / open / add), authentication (datapin auth), archive remotes for FAIR data publication to Zenodo/InvenioRDM (datapin remote add / ls / rm), DOI-minting dataset publication (datapin publish), metadata linting and FAIR assessment (datapin check), standard metadata export (datapin export), citations (datapin cite), static documentation sites with dataset landing pages (datapin site build / preview / publish), and journal-versioned workspace remotes on directories, S3, or SFTP for cluster-to-laptop sync (datapin push / pull --workspace / revert / gc)."
+description: "Use when working with the Open Science Framework (OSF) for research data management. Invoke when: the project contains a .datapin/datapin.toml manifest (or a legacy .gosf/gosf.toml from datapin's previous life as gosf); the user mentions OSF, osf.io, or osfclient; the task involves syncing, pushing, or pulling research data files with an OSF project; the task involves an OSF project wiki or its markdown pages; or you need to inspect, manage, or automate files stored in OSF Storage. Covers the full datapin CLI: manifest management (datapin init / add / status / sync), file transfer (datapin pull / push / rm), storage management (datapin mkdir / mv / cp), project navigation (datapin ls / info / projects / versions / open / set), project wikis (datapin wiki ls / get / push / rm / mv / versions / open / add), authentication (datapin auth), archive remotes for FAIR data publication to Zenodo/InvenioRDM (datapin remote add / ls / rm), DOI-minting dataset publication (datapin publish), metadata linting and FAIR assessment (datapin check), standard metadata export (datapin export), citations (datapin cite), static documentation sites with dataset landing pages (datapin site build / preview / publish), journal-versioned workspace remotes on directories, S3, or SFTP for cluster-to-laptop sync (datapin push / pull --workspace / revert / gc), and one-command export of OSF projects off the sunsetting platform into datapin datasets (datapin migrate)."
 metadata:
   version: "0.1.0"
 ---
@@ -380,6 +380,42 @@ datapin versions <project>:<path> [--output=json] # list file versions (files on
 datapin open <project>[:<path>] [--output=json]   # open in browser (or print URL)
 datapin set <project> [--title ...] [--description ...] [--category ...] [--tags ...]
 ```
+
+### Migrate off OSF
+
+OSF is sunsetting its projects service; `datapin migrate` is the exit ramp. It
+turns an OSF project into a datapin project: files downloaded and MD5-verified,
+wiki pages exported as markdown site pages, node metadata mapped to a dataset
+metadata skeleton, and `[[datasets]]` scaffolded in the manifest. What OSF
+cannot supply (license, ORCIDs, contact email) is written as loud `TODO`
+markers — review the manifest and run `datapin check` before `datapin publish`.
+A `MIGRATED.md` provenance breadcrumb (source GUID, timestamp, TODO checklist)
+is written next to the data, and each dataset carries an `IsDerivedFrom`
+related identifier pointing at the osf.io origin.
+
+```bash
+# GUID mode: export any OSF project (anonymous works for public projects)
+datapin migrate abc12 [dest]        # files + wikis (docs/<page>.md) + fresh manifest
+datapin migrate abc12 --components  # also export each component as its own dataset
+                                    # (default: root only, with a notice)
+
+# Manifest mode: convert a repo whose manifest tracks OSF, in place
+datapin migrate                     # fetch MISSING/BEHIND first (DIVERGED fails hard),
+                                    # group [[files]] into [[datasets]] (one per
+                                    # top-level directory), [[wikis]] → site pages,
+                                    # rewrite the manifest with OSF sections removed
+datapin migrate --dataset raw=data/raw/**   # override grouping (repeatable)
+
+# Both modes
+datapin migrate ... --dry-run       # print the full plan, write nothing
+datapin migrate ... --yes           # skip the interactive confirmation
+```
+
+Re-running is idempotent: files whose MD5 already matches are skipped, and
+metadata you have edited (per dataset slug) is preserved. Nothing is uploaded
+and no DOI is minted — publishing stays a separate, deliberate `datapin publish`.
+In `--output=json` mode there are no prompts and exit code 1 signals that
+metadata TODOs remain (the export itself succeeded).
 
 ## Common workflows
 

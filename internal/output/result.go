@@ -216,3 +216,45 @@ type RemoteListEntry struct {
 type RemoteRmResult struct {
 	Name string `json:"name"`
 }
+
+// MigrateWikiPage is one exported wiki page in a MigrateResult.
+type MigrateWikiPage struct {
+	Page  string `json:"page"`
+	Local string `json:"local"`
+}
+
+// MigrateDataset is one scaffolded dataset in a MigrateResult.
+type MigrateDataset struct {
+	Slug  string `json:"slug"`
+	Files int    `json:"files"`
+}
+
+// MigrateResult is emitted by `datapin migrate --output=json`.
+type MigrateResult struct {
+	Mode              string            `json:"mode"`   // "guid" or "manifest"
+	Source            string            `json:"source"` // the OSF GUID migrated from
+	Dest              string            `json:"dest,omitempty"`
+	Manifest          string            `json:"manifest"`
+	Downloaded        []TransferItem    `json:"downloaded"`
+	Skipped           []TransferItem    `json:"skipped"` // already local and MD5-identical
+	WikiPages         []MigrateWikiPage `json:"wiki_pages"`
+	Datasets          []MigrateDataset  `json:"datasets"`
+	ComponentsSkipped []string          `json:"components_skipped,omitempty"`
+	TODOs             []string          `json:"todos"`
+	DryRun            bool              `json:"dry_run"`
+}
+
+// NewMigrateResult returns a MigrateResult with non-nil slices so they
+// serialise as [] rather than null when empty.
+func NewMigrateResult(mode, source string, dryRun bool) *MigrateResult {
+	return &MigrateResult{
+		Mode:       mode,
+		Source:     source,
+		DryRun:     dryRun,
+		Downloaded: []TransferItem{},
+		Skipped:    []TransferItem{},
+		WikiPages:  []MigrateWikiPage{},
+		Datasets:   []MigrateDataset{},
+		TODOs:      []string{},
+	}
+}
