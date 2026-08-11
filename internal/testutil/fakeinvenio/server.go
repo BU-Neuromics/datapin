@@ -36,8 +36,9 @@ import (
 
 // Server is the fake. Zero value is not usable; call New.
 type Server struct {
-	ts    *httptest.Server
-	token string
+	ts      *httptest.Server
+	presign *httptest.Server // PresignPartURLs: separate host for part PUTs
+	token   string
 
 	mu      sync.Mutex
 	nextID  int
@@ -108,8 +109,33 @@ func New(token string) *Server {
 // URL returns the base URL (stands in for https://sandbox.zenodo.org).
 func (s *Server) URL() string { return s.ts.URL }
 
+// PresignPartURLs makes multipart part links point at a SEPARATE host
+// that rejects any request carrying an Authorization header — the way a
+// pre-signed S3 URL fails when conflicting auth is attached
+// (LIVE-VERIFIED: sandbox part PUTs 403 when the bearer token is sent;
+// real Zenodo part links are pre-signed object-storage URLs). Parts are
+// otherwise handled identically.
+func (s *Server) PresignPartURLs() {
+	s.presign = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "" {
+			w.WriteHeader(403)
+			_, _ = w.Write([]byte("<Error><Code>SignatureDoesNotMatch</Code></Error>"))
+			return
+		}
+		// The pre-signed URL itself is the authorization — impersonate it
+		// so the shared route handler accepts the forwarded request.
+		r.Header.Set("Authorization", "Bearer "+s.token)
+		s.route(w, r)
+	}))
+}
+
 // Close shuts the server down.
-func (s *Server) Close() { s.ts.Close() }
+func (s *Server) Close() {
+	s.ts.Close()
+	if s.presign != nil {
+		s.presign.Close()
+	}
+}
 
 // ListRequests returns "METHOD path" for every request served, for
 // request-count assertions (the fakeosf pattern).
@@ -716,12 +742,18 @@ func (s *Server) fileJSON(rec *record, f *file) map[string]any {
 		j["size"] = f.size
 	}
 	if f.transfer == "M" {
-		// Fixture 39: per-part upload URLs with ~14-day expirations.
+		// Fixture 39: per-part upload URLs with ~14-day expirations. With
+		// PresignPartURLs the links live on the presigned host instead
+		// (real Zenodo serves object-storage URLs here).
+		partBase := self
+		if s.presign != nil {
+			partBase = s.presign.URL + "/api/records/" + rec.id + "/draft/files/" + f.key
+		}
 		var parts []any
 		for i := 1; i <= f.parts; i++ {
 			parts = append(parts, map[string]any{
 				"part":       i,
-				"url":        self + "/content/" + strconv.Itoa(i),
+				"url":        partBase + "/content/" + strconv.Itoa(i),
 				"expiration": "2026-08-24T23:38:00.765560+00:00",
 			})
 		}
