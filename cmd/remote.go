@@ -52,18 +52,39 @@ accounts and tokens — register them as two remotes:
 		if name == "" {
 			return fmt.Errorf("--name is required (e.g. --name sandbox)")
 		}
-		bk, err := newArchiveBackend(config.Remote{Name: name, Kind: remoteAddKind, URL: url}, remoteAddToken)
-		if err != nil {
-			return err
-		}
-		if !remoteAddNoVerify {
-			log.Infof("probing %s", url)
-			p, ok := bk.(pingable)
-			if !ok {
-				return fmt.Errorf("kind %q cannot be probed", remoteAddKind)
+		sandbox := false
+		if isWorkspaceKind(remoteAddKind) {
+			if !remoteAddNoVerify {
+				log.Infof("probing %s", url)
+				ws, closer, err := newWorkspace(config.Remote{Name: name, Kind: remoteAddKind, URL: url}, remoteAddToken)
+				if err != nil {
+					return fmt.Errorf("%w\n(use --no-verify to add it anyway)", err)
+				}
+				if _, err := ws.List(cmd.Context()); err != nil {
+					if closer != nil {
+						_ = closer()
+					}
+					return fmt.Errorf("%w\n(use --no-verify to add it anyway)", err)
+				}
+				if closer != nil {
+					_ = closer()
+				}
 			}
-			if err := p.Ping(cmd.Context()); err != nil {
-				return fmt.Errorf("%w\n(use --no-verify to add it anyway)", err)
+		} else {
+			bk, err := newArchiveBackend(config.Remote{Name: name, Kind: remoteAddKind, URL: url}, remoteAddToken)
+			if err != nil {
+				return err
+			}
+			sandbox = bk.Capabilities().Sandbox
+			if !remoteAddNoVerify {
+				log.Infof("probing %s", url)
+				p, ok := bk.(pingable)
+				if !ok {
+					return fmt.Errorf("kind %q cannot be probed", remoteAddKind)
+				}
+				if err := p.Ping(cmd.Context()); err != nil {
+					return fmt.Errorf("%w\n(use --no-verify to add it anyway)", err)
+				}
 			}
 		}
 
@@ -78,18 +99,19 @@ accounts and tokens — register them as two remotes:
 			tokenStored = true
 		}
 
-		caps := bk.Capabilities()
 		if flagOutput == "json" {
 			return output.PrintJSON(os.Stdout, output.RemoteAddResult{
 				Name: name, Kind: remoteAddKind, URL: url,
-				Sandbox: caps.Sandbox, TokenStored: tokenStored,
+				Sandbox: sandbox, TokenStored: tokenStored,
 			})
 		}
 		log.Infof("added remote %q (%s)", name, url)
-		if caps.Sandbox {
+		if sandbox {
 			log.Infof("this is a sandbox instance — DOIs it mints (prefix 10.5072) do not resolve")
 		}
-		if !tokenStored && config.LoadRemoteToken(name) == "" {
+		if isWorkspaceKind(remoteAddKind) {
+			log.Infof("workspace remote — datasets push/pull here with journal versioning; publishing needs an archive remote")
+		} else if !tokenStored && config.LoadRemoteToken(name) == "" {
 			log.Infof("no token stored — set DATAPIN_TOKEN_%s or re-add with --token before publishing", envSuffix(name))
 		}
 		return nil

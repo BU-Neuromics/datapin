@@ -60,7 +60,14 @@ Examples:
 			return runBarePush(cmd)
 		}
 		if len(args) == 1 {
-			return fmt.Errorf("usage: datapin push <src> <project>:<path>")
+			// A bare argument naming a manifest dataset pushes it to its
+			// workspace remote (journal-versioned, no DOI).
+			if !strings.Contains(args[0], ":") {
+				if handled, err := runDatasetPush(cmd.Context(), args[0]); handled {
+					return err
+				}
+			}
+			return fmt.Errorf("usage: datapin push <src> <project>:<path>, or datapin push <slug> for a dataset")
 		}
 
 		src := args[0]
