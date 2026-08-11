@@ -131,6 +131,16 @@ func (s *Store) path(key string) string { return path.Join(s.base, key) }
 // List implements workspace.Store.
 func (s *Store) List(ctx context.Context) (map[string]workspace.ObjectInfo, error) {
 	out := map[string]workspace.ObjectInfo{}
+	// A base that does not exist yet is a valid, empty workspace — the
+	// dir driver creates its root, S3 prefixes are virtual, and Push
+	// MkdirAlls on first write. `remote add`'s probe must not fail on a
+	// fresh directory.
+	if _, err := s.client.Stat(s.base); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return out, nil
+		}
+		return nil, err
+	}
 	walker := s.client.Walk(s.base)
 	for walker.Step() {
 		if err := walker.Err(); err != nil {

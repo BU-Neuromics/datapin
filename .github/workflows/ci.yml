@@ -92,14 +92,14 @@ jobs:
           done
           ssh-keyscan -p 2222 localhost 2>/dev/null | grep -q ssh-
 
-      - name: Run real-protocol workspace tests
+      - name: Run real-protocol workspace tests (drivers + CLI end-to-end)
         env:
           DATAPIN_TEST_S3_ENDPOINT: localhost:9000
           DATAPIN_TEST_S3_ACCESS: datapin
           DATAPIN_TEST_S3_SECRET: datapin-secret
           DATAPIN_TEST_SFTP_URL: sftp://demo@localhost:2222/upload
           DATAPIN_TEST_SFTP_PASSWORD: demopass
-        run: go test -tags live -count=1 -v ./internal/workspace/...
+        run: go test -tags live -count=1 -v ./internal/workspace/... ./integration/liveworkspace/...
 
   cross-build:
     name: Cross-compile (${{ matrix.goos }}/${{ matrix.goarch }})
