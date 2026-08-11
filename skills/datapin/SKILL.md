@@ -1,6 +1,6 @@
 ---
 name: datapin
-description: "Use when working with the Open Science Framework (OSF) for research data management. Invoke when: the project contains a .datapin/datapin.toml manifest (or a legacy .gosf/gosf.toml from datapin's previous life as gosf); the user mentions OSF, osf.io, or osfclient; the task involves syncing, pushing, or pulling research data files with an OSF project; the task involves an OSF project wiki or its markdown pages; or you need to inspect, manage, or automate files stored in OSF Storage. Covers the full datapin CLI: manifest management (datapin init / add / status / sync), file transfer (datapin pull / push / rm), storage management (datapin mkdir / mv / cp), project navigation (datapin ls / info / projects / versions / open / set), project wikis (datapin wiki ls / get / push / rm / mv / versions / open / add), authentication (datapin auth), archive remotes for FAIR data publication to Zenodo/InvenioRDM (datapin remote add / ls / rm), DOI-minting dataset publication (datapin publish), metadata linting and FAIR assessment (datapin check), standard metadata export (datapin export), citations (datapin cite), and static documentation sites with dataset landing pages (datapin site build / preview / publish)."
+description: "Use when working with the Open Science Framework (OSF) for research data management. Invoke when: the project contains a .datapin/datapin.toml manifest (or a legacy .gosf/gosf.toml from datapin's previous life as gosf); the user mentions OSF, osf.io, or osfclient; the task involves syncing, pushing, or pulling research data files with an OSF project; the task involves an OSF project wiki or its markdown pages; or you need to inspect, manage, or automate files stored in OSF Storage. Covers the full datapin CLI: manifest management (datapin init / add / status / sync), file transfer (datapin pull / push / rm), storage management (datapin mkdir / mv / cp), project navigation (datapin ls / info / projects / versions / open / set), project wikis (datapin wiki ls / get / push / rm / mv / versions / open / add), authentication (datapin auth), archive remotes for FAIR data publication to Zenodo/InvenioRDM (datapin remote add / ls / rm), DOI-minting dataset publication (datapin publish), metadata linting and FAIR assessment (datapin check), standard metadata export (datapin export), citations (datapin cite), static documentation sites with dataset landing pages (datapin site build / preview / publish), and journal-versioned workspace remotes on directories, S3, or SFTP for cluster-to-laptop sync (datapin push / pull --workspace / revert / gc)."
 metadata:
   version: "0.1.0"
 ---
@@ -130,16 +130,45 @@ distinct from the OSF workspace project). Stored in
 var → keychain → token file.
 
 ```bash
-datapin remote add <url> --name <name> [--kind invenio] [--token-value <tok>] [--no-verify] [--no-keychain]
+datapin remote add <url> --name <name> [--kind invenio|figshare|dataverse] [--token-value <tok>] [--no-verify] [--no-keychain]
 datapin remote ls [--output=json]        # list remotes and whether each has a token
 datapin remote rm <name>                 # remove a remote and its stored token
 ```
 
-`remote add` probes the URL to confirm it answers like an InvenioRDM
-instance (`--no-verify` skips the probe). Zenodo sandbox
+Kinds: `invenio` (Zenodo and any InvenioRDM instance), `figshare`
+(per-version .vN DOIs, no files-import), `dataverse` (one DOI for all
+versions; a collection alias may ride on the URL as
+https://host/dataverse/<alias>, default root). `remote add` probes the
+URL to confirm it answers like the expected API (`--no-verify` skips). Zenodo sandbox
 (https://sandbox.zenodo.org) and production (https://zenodo.org) are
 separate services with separate accounts and tokens — add both as remotes
 when rehearsing a publish. Sandbox DOIs (prefix `10.5072`) do not resolve.
+
+### Workspace remotes (cluster→laptop intermediate results)
+
+Datasets can also sync to a mutable **workspace** remote — no DOIs, no
+metadata ceremony — for the "run on the cluster, pull on the laptop"
+workflow. Every workspace remote gets the same journal versioning: before
+an overwrite, the superseded bytes archive server-side under
+`.datapin/versions/`, and an append-only journal under `.datapin/journal/`
+narrates every push and revert. **Every version datapin wrote is
+revertible** (until `gc` reclaims it).
+
+```bash
+datapin remote add /mnt/lab-share --name nas --kind dir           # mounted path
+datapin remote add s3://minio.lab:9000/bucket/prefix --name s3 --kind s3   # token: "ACCESS:SECRET"
+datapin remote add sftp://user@cluster/scratch/proj --name hpc --kind sftp # ssh-agent/keys/known_hosts
+datapin push <slug>                       # dataset files → workspace (journaled)
+datapin pull <slug> --workspace           # fetch current workspace bytes
+datapin versions <slug>/<key>             # one file's journal: pushes, reverts, recoverability
+datapin revert <slug>/<key> --to <n> [--reason <why>]   # journaled restore (history never rewrites)
+datapin gc [--keep N]                     # reclaim archived versions (default keeps 3 per file)
+```
+
+Set `workspace = "<name>"` on a dataset (or `default_workspace` under
+`[project]`). An unpublished dataset with a workspace pulls from it by
+default. Out-of-band overwrites (scp over a tracked file) are detected,
+flagged in the journal, and their bytes archived rather than lost.
 
 ### Datasets and publishing (FAIR data publication)
 

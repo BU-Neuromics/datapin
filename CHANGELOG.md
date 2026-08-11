@@ -11,6 +11,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > previous life as gosf and are kept verbatim (their release links point at
 > the original gosf repository).
 
+## [0.2.0] - 2026-08-11
+
+The backends release: two more archive platforms and the workspace tier.
+
+### Added
+
+- **Figshare archive backend** (`remote add --kind figshare`): parted
+  uploads with server-side MD5 verification, reserve-DOI, `.vN` version
+  DOIs under a stable base DOI, SPDX-to-vocabulary license mapping.
+- **Dataverse archive backend** (`remote add --kind dataverse`): DOI
+  reserved at dataset creation, one DOI across all versions, keys with
+  `/` map onto directoryLabel, collection alias on the remote URL
+  (`https://host/dataverse/<alias>`).
+- **Cross-adapter contract suite**: one set of Backend-semantics tests run
+  against every adapter's hermetic fake, so adapters cannot drift apart.
+- **Workspace remotes** (`remote add --kind dir|s3|sftp`): journal-versioned
+  dataset sync for the cluster→laptop workflow. `datapin push <slug>`
+  archives superseded versions server-side (content-addressed) and appends
+  to an append-only journal; `pull <slug> --workspace`,
+  `versions <slug>/<key>`, `revert <slug>/<key> --to N --reason`, and
+  `gc --keep N` complete the surface. Out-of-band overwrites are detected,
+  flagged, and their bytes archived. Invariant: every version datapin
+  wrote is revertible.
+- S3 driver (MinIO/R2/institutional; server-side copy archiving), SFTP
+  driver (ssh-agent/key/password ladder, known_hosts verification), and
+  plain-directory driver (mounted NAS shares).
+
+### Known limitations
+
+- The Figshare and Dataverse fakes encode documented API behavior; the
+  drivers are not yet verified against live services (no credentials were
+  available). Treat first live runs as verification spikes.
+
 ## [0.1.0] - 2026-08-11
 
 The reboot release: datapin is now a FAIR data publication tool. Everything

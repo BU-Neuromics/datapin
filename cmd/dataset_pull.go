@@ -12,7 +12,10 @@ import (
 	"github.com/BU-Neuromics/datapin/internal/output"
 )
 
-var pullLatest bool
+var (
+	pullLatest    bool
+	pullWorkspace bool
+)
 
 // datasetPullFile is one row of the dataset-pull JSON result.
 type datasetPullFile struct {
@@ -43,8 +46,13 @@ func runDatasetPull(ctx context.Context, slug string) (handled bool, err error) 
 		return false, nil
 	}
 
+	// --workspace, or an unpublished dataset with a workspace remote,
+	// pulls the mutable workspace bytes instead of archive bytes.
+	if pullWorkspace || (ds.Record == "" && ds.ResolveWorkspace(m.Project.DefaultWorkspace) != "") {
+		return true, runWorkspacePull(ctx, m, manifestPath, repoRoot, ds)
+	}
 	if ds.Record == "" {
-		return true, fmt.Errorf("dataset %q has never been published — nothing to pull (datapin publish %s)", slug, slug)
+		return true, fmt.Errorf("dataset %q has never been published — nothing to pull (datapin publish %s, or configure a workspace and datapin push %s)", slug, slug, slug)
 	}
 	bk, _, err := resolveArchive(ds, m)
 	if err != nil {

@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/BU-Neuromics/datapin/internal/backend"
+	"github.com/BU-Neuromics/datapin/internal/backend/dataverse"
+	"github.com/BU-Neuromics/datapin/internal/backend/figshare"
 	"github.com/BU-Neuromics/datapin/internal/backend/invenio"
 	"github.com/BU-Neuromics/datapin/internal/config"
 	"github.com/BU-Neuromics/datapin/internal/log"
@@ -31,14 +33,31 @@ func resolveArchive(ds *manifest.Dataset, m *manifest.Manifest) (backend.Backend
 		return nil, config.Remote{}, fmt.Errorf(
 			"archive remote %q is not configured — add it with: datapin remote add <url> --name %s", name, name)
 	}
-	if r.Kind != "invenio" {
-		return nil, config.Remote{}, fmt.Errorf("remote %q has unsupported kind %q", name, r.Kind)
-	}
-	bk, err := invenio.New(r.URL, config.LoadRemoteToken(name))
+	bk, err := newArchiveBackend(r, config.LoadRemoteToken(name))
 	if err != nil {
 		return nil, config.Remote{}, err
 	}
 	return bk, r, nil
+}
+
+// pingable is what `remote add` probes; every archive driver implements it.
+type pingable interface {
+	Ping(ctx context.Context) error
+}
+
+// newArchiveBackend constructs the driver for a configured remote's kind —
+// the one registry both resolveArchive and `remote add` use.
+func newArchiveBackend(r config.Remote, token string) (backend.Backend, error) {
+	switch r.Kind {
+	case "invenio":
+		return invenio.New(r.URL, token)
+	case "figshare":
+		return figshare.New(r.URL, token)
+	case "dataverse":
+		return dataverse.New(r.URL, token)
+	default:
+		return nil, fmt.Errorf("remote %q has unsupported kind %q (supported: invenio, figshare, dataverse)", r.Name, r.Kind)
+	}
 }
 
 // datasetLocalState computes each tracked file's MD5 and size. Missing

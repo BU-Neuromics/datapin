@@ -49,6 +49,9 @@ type SitePage struct {
 type ProjectConfig struct {
 	ID             string `toml:"id"`
 	DefaultArchive string `toml:"default_archive,omitempty"`
+	// DefaultWorkspace names the mutable remote datasets push to for the
+	// cluster→laptop workflow (plan §4.7); no DOIs, no metadata ceremony.
+	DefaultWorkspace string `toml:"default_workspace,omitempty"`
 }
 
 // Dataset is one publishable record: a named group of files that publish
@@ -58,6 +61,9 @@ type Dataset struct {
 	// Archive names the configured archive remote; empty = the project's
 	// default_archive.
 	Archive string `toml:"archive,omitempty"`
+	// Workspace names the mutable workspace remote for push/pull of
+	// intermediate results; empty = the project's default_workspace.
+	Workspace string `toml:"workspace,omitempty"`
 	// Record is the latest published version's record id ("" until the
 	// first publish); Concept is the parent id grouping all versions (D21).
 	Record     string          `toml:"record"`
@@ -75,6 +81,14 @@ func (d Dataset) ResolveArchive(defaultArchive string) string {
 		return d.Archive
 	}
 	return defaultArchive
+}
+
+// ResolveWorkspace returns the workspace remote name for this dataset.
+func (d Dataset) ResolveWorkspace(defaultWorkspace string) string {
+	if d.Workspace != "" {
+		return d.Workspace
+	}
+	return defaultWorkspace
 }
 
 // DatasetFile pins one file of a dataset: a local path, its flat key on
