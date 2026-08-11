@@ -285,20 +285,31 @@ abc12/xyz34:/path             # path inside component xyz34 of project abc12
 
 ### `datapin onboard`
 
-Guided, interactive setup — the easiest way to start. It detects your current
-state and resumes at the right step, so it's safe to re-run:
+Guided, interactive setup for publishing a dataset — the easiest way to start.
+It detects what is already configured and resumes at the first missing piece,
+so it's safe to re-run:
 
-1. **Authenticate** (offered if you're not logged in).
-2. **Attach a project** — type a GUID or pick from your project list.
-3. **Select files to push** — a collapsible file-tree of the things git doesn't
-   track (data, models, artifacts); check individual files or whole directories.
+1. **Choose where to publish** — the Zenodo sandbox first (rehearse the whole
+   flow there; its DOIs are fake and its records disposable), then Zenodo, any
+   InvenioRDM instance, Dataverse, or Figshare. Existing remotes are offered
+   for reuse; a new one is probed and its token stored.
+2. **Select the files** for the dataset — a collapsible file-tree of the things
+   git doesn't track (data, models, artifacts).
+3. **Describe it** — title, creators with validated ORCIDs, and a license you
+   choose explicitly (CC0-1.0 is suggested, CC-BY-4.0 is the named
+   alternative; datapin never fills one in). A contact e-mail is required when
+   the target is Dataverse.
+4. **Optionally add a workspace remote** (`dir`/`s3`/`sftp`) for mutable
+   intermediate results that need versioned sync but no DOI.
 
-It records your picks in `.datapin/datapin.toml` and stops there; run `datapin sync` to
-upload. Requires an interactive terminal.
+It writes `.datapin/datapin.toml`, lints the metadata, and stops there — run
+`datapin check <slug>` and then `datapin publish <slug>` to mint a DOI.
+Requires an interactive terminal.
 
 ```console
 $ datapin onboard
-$ datapin onboard --project abc12 --remote-base /inputs   # skip the prompts
+$ datapin onboard --osf                                   # legacy OSF workspace wizard (deprecated)
+$ datapin onboard --osf --project abc12 --remote-base /inputs
 ```
 
 ### `datapin ls <project>[:<path>]`

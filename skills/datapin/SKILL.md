@@ -260,17 +260,24 @@ version = 0
 ### Manifest commands
 
 ```bash
-datapin onboard [--project <guid>] [--remote-base <path>]  # interactive guided setup (TTY only)
+datapin onboard [--osf] [--project <guid>] [--remote-base <path>] [--no-keychain]  # interactive guided setup (TTY only)
 datapin init <project-id>                              # create/update .datapin/datapin.toml
 datapin add <local-path> [<project>:]<remote-path>     # track file(s) (dir = recursive)
 datapin status [--no-check-remote] [--jobs=N] [--output=json]   # show sync state of all entries
 datapin sync [--force] [--resolve=ours|theirs] [--dry-run] [--no-check-remote] [--jobs=N] [--output=json]
 ```
 
-`datapin onboard` is a resumable, interactive wizard (auth → attach a project → pick
-git-untracked files to push via a tree checkbox UI). It writes manifest entries
-and stops; run `datapin sync` to upload. TTY only — for scripting/agents, use
-`init` + `add` + `sync` directly.
+`datapin onboard` is a resumable, interactive wizard for the publish workflow:
+choose an archive remote (Zenodo sandbox suggested first for a rehearsal run) →
+group git-untracked files into a `[[datasets]]` entry via a tree checkbox UI →
+fill in the metadata a published record needs (title, creators with ORCIDs, an
+explicit license choice — CC0-1.0 suggested, CC-BY-4.0 the named alternative;
+contact e-mail, required for Dataverse) → optionally add a workspace remote
+(dir/s3/sftp) for mutable intermediate results. It writes the manifest and
+stops, pointing at `datapin check <slug>` + `datapin publish <slug>`. `--osf` runs the
+legacy OSF workspace wizard instead (deprecated — OSF is sunsetting; `--project`
+and `--remote-base` apply only there). TTY only — for scripting/agents, use
+`datapin remote add` and edit the manifest directly.
 
 `datapin add` registers a local file; `datapin pull` registers what it downloads. Both
 are just ways to get an entry into the manifest — neither fixes which way the

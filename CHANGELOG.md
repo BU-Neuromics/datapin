@@ -11,6 +11,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > previous life as gosf and are kept verbatim (their release links point at
 > the original gosf repository).
 
+## [Unreleased]
+
+### Changed
+
+- **`datapin onboard` now onboards into the publish workflow** (#25, D53):
+  choose an archive remote (Zenodo sandbox first — rehearse where the DOIs are
+  fake), group local files into a `[[datasets]]` entry, and fill in the
+  DataCite floor (title, creators with validated ORCIDs, an explicit license
+  choice — CC0-1.0 suggested, CC-BY-4.0 the named alternative, never
+  prefilled; contact e-mail required for Dataverse). It finishes by linting the
+  metadata and pointing at `datapin check <slug>` + `datapin publish <slug>`,
+  after offering the optional second track — a dir/s3/sftp workspace remote
+  for mutable intermediate results. Still TTY-only and resumable.
+- The legacy OSF workspace wizard lives on behind **`datapin onboard --osf`**
+  (deprecated — OSF is sunsetting; see `datapin migrate`). `--project` and
+  `--remote-base` now apply only to that flow and are refused without it.
+
 ## [0.2.0] - 2026-08-11
 
 The backends release: two more archive platforms and the workspace tier.
