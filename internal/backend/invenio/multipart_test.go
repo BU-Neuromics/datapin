@@ -293,3 +293,35 @@ func TestMultipart_RegistrationRequiresPartsSizeAndPartSize(t *testing.T) {
 		}
 	}
 }
+
+// LIVE-VERIFIED divergence (first sandbox multipart run, HTTP 403 on
+// part 1): real Zenodo's part links are pre-signed object-storage URLs
+// on a different host — attaching the API bearer token breaks their
+// signature. Credentials travel only to the API's own host (the same
+// rule as Waterbutler's cross-host redirect handling).
+func TestUploadFile_MultipartPresignedPartsGetNoToken(t *testing.T) {
+	c, srv := newMultipartClient(t, 16, 10)
+	srv.PresignPartURLs()
+	ctx := context.Background()
+	id, err := c.CreateDraft(ctx, meta())
+	if err != nil {
+		t.Fatalf("CreateDraft: %v", err)
+	}
+	content := []byte("0123456789abcdefghij01234") // 25 bytes → 3 parts
+	fi := mustUpload(t, c, id, "big.bin", content)
+	if fi.Checksum != md5of(content) {
+		t.Errorf("committed checksum = %v, want %v", fi.Checksum, md5of(content))
+	}
+
+	res, err := c.Publish(ctx, id)
+	if err != nil {
+		t.Fatalf("Publish: %v", err)
+	}
+	var buf bytes.Buffer
+	if err := c.DownloadFile(ctx, res.RecordID, "big.bin", &buf); err != nil {
+		t.Fatalf("DownloadFile: %v", err)
+	}
+	if !bytes.Equal(buf.Bytes(), content) {
+		t.Errorf("presigned multipart round trip corrupted")
+	}
+}

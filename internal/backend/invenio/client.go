@@ -536,12 +536,18 @@ func (c *Client) uploadMultipart(ctx context.Context, id backend.DraftID, key st
 
 // putPart streams one multipart part. Like the single-file content PUT it
 // is not retried (the body is a stream).
-func (c *Client) putPart(ctx context.Context, url string, r io.Reader, n int64) error {
-	req, err := http.NewRequestWithContext(ctx, "PUT", url, r)
+func (c *Client) putPart(ctx context.Context, partURL string, r io.Reader, n int64) error {
+	req, err := http.NewRequestWithContext(ctx, "PUT", partURL, r)
 	if err != nil {
 		return err
 	}
-	if c.token != "" {
+	// LIVE-VERIFIED (first sandbox multipart run, 403 on part 1): real
+	// Zenodo's part links are pre-signed object-storage URLs on another
+	// host — attaching the bearer token breaks their signature. The token
+	// travels only to the API's own host (the Waterbutler cross-host
+	// rule); local-storage instances serve same-host part URLs and still
+	// get it.
+	if c.token != "" && sameHost(partURL, c.base) {
 		req.Header.Set("Authorization", "Bearer "+c.token)
 	}
 	req.Header.Set("Content-Type", "application/octet-stream")
@@ -743,4 +749,11 @@ func toFileInfos(list filesListJSON) []backend.FileInfo {
 		out = append(out, list.Entries[i].toFileInfo())
 	}
 	return out
+}
+
+// sameHost reports whether two URLs share a host (scheme-insensitive).
+func sameHost(a, b string) bool {
+	ua, errA := url.Parse(a)
+	ub, errB := url.Parse(b)
+	return errA == nil && errB == nil && ua.Host == ub.Host
 }
