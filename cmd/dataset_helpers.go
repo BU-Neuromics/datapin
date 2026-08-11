@@ -159,6 +159,15 @@ func publishPreflight(ds *manifest.Dataset) error {
 	if len(ds.Files) == 0 {
 		return fmt.Errorf("dataset %q has no files — add some under [[datasets.files]]", ds.Slug)
 	}
+	// A missing license is only a warning while drafting (`check`), but
+	// publishing grants rights permanently: without an explicit choice the
+	// backend applies its own default license on the user's behalf (D37).
+	if strings.TrimSpace(ds.Metadata.License) == "" {
+		return fmt.Errorf("dataset %q has no license — publishing requires an explicit license choice.\n"+
+			"Set license in [datasets.metadata] (an SPDX id): CC0-1.0 dedicates the data to the public domain\n"+
+			"(the common choice for research data), CC-BY-4.0 requires attribution.\n"+
+			"'datapin check %s' validates the id", ds.Slug, ds.Slug)
+	}
 	issues := meta.Check(ds.Metadata)
 	for _, i := range issues {
 		if i.Severity == meta.Warning {

@@ -191,8 +191,9 @@ func (c *Client) apiError(resp *http.Response, method, path string) error {
 
 // figshareMetadata renders backend.Metadata as article fields. The
 // license is resolved against the instance's license vocabulary; an
-// unmappable SPDX id is omitted (check warns upstream).
-func (c *Client) figshareMetadata(ctx context.Context, m backend.Metadata) map[string]any {
+// unmappable SPDX id is a loud, typed error — never silently omitted
+// (which would publish under Figshare's own default license, D37).
+func (c *Client) figshareMetadata(ctx context.Context, m backend.Metadata) (map[string]any, error) {
 	md := map[string]any{
 		"title":        m.Title,
 		"defined_type": "dataset",
@@ -215,18 +216,20 @@ func (c *Client) figshareMetadata(ctx context.Context, m backend.Metadata) map[s
 		}
 		md["authors"] = authors
 	}
-	if id := c.licenseID(ctx, m.License); id > 0 {
+	if m.License != "" {
+		id, err := c.licenseID(ctx, m.License)
+		if err != nil {
+			return nil, err
+		}
 		md["license"] = id
 	}
-	return md
+	return md, nil
 }
 
 // licenseID maps an SPDX id onto the instance's license vocabulary by
-// URL fragment (license ids are instance-defined integers).
-func (c *Client) licenseID(ctx context.Context, spdx string) int {
-	if spdx == "" {
-		return 0
-	}
+// URL fragment (license ids are instance-defined integers). An id the
+// instance cannot satisfy is a ValidationError listing what it offers.
+func (c *Client) licenseID(ctx context.Context, spdx string) (int, error) {
 	fragment := map[string]string{
 		"cc0-1.0":      "publicdomain/zero",
 		"cc-by-4.0":    "licenses/by/4.0",
@@ -236,35 +239,45 @@ func (c *Client) licenseID(ctx context.Context, spdx string) int {
 		"apache-2.0":   "Apache",
 		"gpl-3.0":      "gpl-3",
 	}[strings.ToLower(spdx)]
-	if fragment == "" {
-		return 0
-	}
 	var licenses []struct {
 		Value int    `json:"value"`
 		Name  string `json:"name"`
 		URL   string `json:"url"`
 	}
 	if err := c.doJSON(ctx, "GET", "/account/licenses", nil, &licenses); err != nil {
-		return 0
+		return 0, fmt.Errorf("fetching the instance's license vocabulary: %w", err)
 	}
-	for _, l := range licenses {
-		if strings.Contains(strings.ToLower(l.URL), strings.ToLower(fragment)) ||
-			strings.Contains(strings.ToLower(l.Name), strings.ToLower(fragment)) {
-			return l.Value
+	if fragment != "" {
+		for _, l := range licenses {
+			if strings.Contains(strings.ToLower(l.URL), strings.ToLower(fragment)) ||
+				strings.Contains(strings.ToLower(l.Name), strings.ToLower(fragment)) {
+				return l.Value, nil
+			}
 		}
 	}
-	return 0
+	var offered []string
+	for _, l := range licenses {
+		offered = append(offered, l.Name)
+	}
+	return 0, &backend.ValidationError{
+		Message: fmt.Sprintf("this Figshare instance does not offer license %q; it offers: %s",
+			spdx, strings.Join(offered, ", ")),
+	}
 }
 
 // --- Backend implementation ---
 
 // CreateDraft implements backend.Backend.
 func (c *Client) CreateDraft(ctx context.Context, meta backend.Metadata) (backend.DraftID, error) {
+	md, err := c.figshareMetadata(ctx, meta)
+	if err != nil {
+		return "", err
+	}
 	var out struct {
 		EntityID json.Number `json:"entity_id"`
 		Location string      `json:"location"`
 	}
-	if err := c.doJSON(ctx, "POST", "/account/articles", c.figshareMetadata(ctx, meta), &out); err != nil {
+	if err := c.doJSON(ctx, "POST", "/account/articles", md, &out); err != nil {
 		return "", fmt.Errorf("creating draft article: %w", err)
 	}
 	id := out.EntityID.String()
@@ -277,7 +290,11 @@ func (c *Client) CreateDraft(ctx context.Context, meta backend.Metadata) (backen
 
 // UpdateMetadata implements backend.Backend.
 func (c *Client) UpdateMetadata(ctx context.Context, id backend.DraftID, meta backend.Metadata) error {
-	return c.doJSON(ctx, "PUT", "/account/articles/"+string(id), c.figshareMetadata(ctx, meta), nil)
+	md, err := c.figshareMetadata(ctx, meta)
+	if err != nil {
+		return err
+	}
+	return c.doJSON(ctx, "PUT", "/account/articles/"+string(id), md, nil)
 }
 
 // UploadFile implements backend.Backend via the parted flow: initiate

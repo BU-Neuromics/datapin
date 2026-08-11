@@ -37,6 +37,7 @@ type Client struct {
 	token      string
 	http       *httpx.RetryClient
 	caps       backend.Caps
+	licCache   []licenseEntry // /api/licenses, fetched once per client
 }
 
 // New returns a Client for the instance at baseURL. A collection alias
@@ -219,7 +220,9 @@ func pidQuery(pid string) string { return "?persistentId=" + url.QueryEscape(pid
 // --- metadata ---
 
 // datasetJSON renders backend.Metadata as the citation metadata block.
-func datasetJSON(m backend.Metadata) map[string]any {
+// lic is the instance-registered license object from resolveLicense (nil
+// to send none).
+func datasetJSON(m backend.Metadata, lic map[string]any) map[string]any {
 	var authors []any
 	var contactName string
 	for _, cr := range m.Creators {
@@ -269,13 +272,70 @@ func datasetJSON(m backend.Metadata) map[string]any {
 			"citation": map[string]any{"displayName": "Citation Metadata", "fields": fields},
 		},
 	}
-	if m.License != "" {
-		version["license"] = map[string]any{
-			"name": m.License,
-			"uri":  "https://spdx.org/licenses/" + m.License + ".html",
-		}
+	if lic != nil {
+		version["license"] = lic
 	}
 	return map[string]any{"datasetVersion": version}
+}
+
+// --- license registry ---
+
+// licenseEntry is one row of the instance's /api/licenses registry.
+type licenseEntry struct {
+	Name             string `json:"name"`
+	URI              string `json:"uri"`
+	Active           bool   `json:"active"`
+	RightsIdentifier string `json:"rightsIdentifier"`
+}
+
+// licenses fetches (once per client) the instance's configured license
+// registry. Dataverse serves it anonymously.
+func (c *Client) licenses(ctx context.Context) ([]licenseEntry, error) {
+	if c.licCache != nil {
+		return c.licCache, nil
+	}
+	var out []licenseEntry
+	if err := c.doJSON(ctx, "GET", "/api/licenses", nil, &out); err != nil {
+		return nil, fmt.Errorf("fetching the instance's license registry: %w", err)
+	}
+	c.licCache = out
+	return out, nil
+}
+
+// licenseToken normalizes a license name or SPDX id for matching:
+// "CC BY 4.0" and "CC-BY-4.0" both become "ccby4.0".
+func licenseToken(s string) string {
+	return strings.ToLower(strings.NewReplacer(" ", "", "-", "").Replace(s))
+}
+
+// resolveLicense maps the manifest's SPDX id onto the instance's
+// registered {name, uri} — real Dataverse rejects anything else (live
+// finding, demo 6.11). Entries are matched by their SPDX
+// rightsIdentifier crosswalk first (not all entries carry it), then by
+// normalized name. An SPDX id the instance does not offer is a loud,
+// typed error — never a silent substitution.
+func (c *Client) resolveLicense(ctx context.Context, spdx string) (map[string]any, error) {
+	if spdx == "" {
+		return nil, nil
+	}
+	entries, err := c.licenses(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var offered []string
+	for _, e := range entries {
+		if !e.Active {
+			continue
+		}
+		offered = append(offered, e.Name)
+		if strings.EqualFold(e.RightsIdentifier, spdx) || licenseToken(e.Name) == licenseToken(spdx) {
+			return map[string]any{"name": e.Name, "uri": e.URI}, nil
+		}
+	}
+	return nil, &backend.ValidationError{
+		Message: fmt.Sprintf("this Dataverse instance does not offer license %q; it offers: %s",
+			spdx, strings.Join(offered, ", ")),
+	}
 }
 
 func field(name, value string) map[string]any {
@@ -291,11 +351,15 @@ func controlledField(name, value string) map[string]any {
 // CreateDraft implements backend.Backend. The DOI (persistentId) is
 // reserved by creation itself.
 func (c *Client) CreateDraft(ctx context.Context, meta backend.Metadata) (backend.DraftID, error) {
+	lic, err := c.resolveLicense(ctx, meta.License)
+	if err != nil {
+		return "", err
+	}
 	var out struct {
 		ID           json.Number `json:"id"`
 		PersistentID string      `json:"persistentId"`
 	}
-	if err := c.doJSON(ctx, "POST", "/api/dataverses/"+c.collection+"/datasets", datasetJSON(meta), &out); err != nil {
+	if err := c.doJSON(ctx, "POST", "/api/dataverses/"+c.collection+"/datasets", datasetJSON(meta, lic), &out); err != nil {
 		return "", fmt.Errorf("creating dataset: %w", err)
 	}
 	return backend.DraftID(out.PersistentID), nil

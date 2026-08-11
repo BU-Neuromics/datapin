@@ -85,7 +85,7 @@ adapter interface, workspace vs archive remotes, Zenodo/InvenioRDM) is in
 
 ## Archive publication (datasets → Zenodo/InvenioRDM)
 
-The FAIR-publication side added in the reboot (plan §4; decisions D11–D27
+The FAIR-publication side added in the reboot (plan §4; decisions D11–D37
 in `docs/decisions.md`). OSF workspace sync above is untouched (D12).
 
 **Packages:**
@@ -141,7 +141,13 @@ from the pure `planDataset` (upload/replace/keep/remove) → refresh
 metadata → clear pending entries → publish → atomic manifest re-pin.
 Failures before publish discard the draft (except `--reserve`); metadata
 completeness is enforced only at this boundary (`publishPreflight` →
-`meta.Check`).
+`meta.Check`). A **license is required to publish** (D37): `check` only warns
+when it is missing, but `publishPreflight` refuses, the confirmation plan
+shows the license next to the PUBLIC/PERMANENT warning, and drivers resolve
+the SPDX id against the target's registry (Dataverse `/api/licenses`,
+Figshare's license vocabulary; Zenodo's vocabulary ids are lowercased SPDX) —
+an id the target does not offer is a loud typed error, never a silent
+substitution or backend default.
 
 **More adapters (Phase 4)**: `internal/backend/figshare` (parted
 uploads, `.vN` DOIs, account-draft version model — no files-import) and
