@@ -557,17 +557,29 @@ func (c *Client) DownloadFile(ctx context.Context, rec backend.RecordID, key str
 	if _, err := io.Copy(io.MultiWriter(w, h), resp.Body); err != nil {
 		return fmt.Errorf("downloading %s: %w", key, err)
 	}
-	// Downloads carry oc-checksum: MD5:<hex>, not Content-MD5 (spike).
+	// Downloads carry oc-checksum: MD5:<hex>, not Content-MD5 (spike) —
+	// and real Zenodo strips leading zeros from the hex (live-tier
+	// finding), so both sides are normalized to 32 chars before comparing.
 	if oc := resp.Header.Get("oc-checksum"); oc != "" {
 		want, err := backend.ParseChecksum(oc)
 		if err == nil && want.Algo == "md5" {
 			got := hex.EncodeToString(h.Sum(nil))
-			if got != want.Hex {
+			if got != padMD5Hex(want.Hex) {
 				return fmt.Errorf("downloading %s: stream MD5 %s does not match server checksum %s", key, got, want.Hex)
 			}
 		}
 	}
 	return nil
+}
+
+// padMD5Hex left-pads a zero-stripped MD5 hex back to its fixed 32 chars.
+// An MD5 is exactly 128 bits, so a shorter value can only be one whose
+// leading zeros were dropped.
+func padMD5Hex(hex string) string {
+	for len(hex) < 32 {
+		hex = "0" + hex
+	}
+	return hex
 }
 
 func toFileInfos(list filesListJSON) []backend.FileInfo {

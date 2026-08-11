@@ -134,6 +134,10 @@ upload) before publishing — deleting a pending entry works (`204`, fixture
   `Content-MD5`; they send **`oc-checksum: MD5:<hex>`** (fixture `46`) and
   support `Accept-Ranges: bytes`. Verify-after-download should use
   `oc-checksum` when present, else hash the stream (we hash anyway).
+  ⚠⚠ **The `oc-checksum` hex strips leading zeros** (caught by the live
+  tier post-spike: header `da8f…` (31 chars) for stream MD5 `0da8f…`) —
+  normalize by left-padding to 32 chars before comparing. `fakeinvenio`
+  mirrors the stripping.
 - **Draft discard leaves no trace**: `DELETE …/draft` → `204`; the id then
   404s ("The persistent identifier does not exist.", fixtures `43`–`45`) —
   matches the contract-suite assertion planned in §6.
