@@ -71,10 +71,18 @@ Exit code: 0 when no errors (warnings allowed), 1 otherwise.`,
 
 			// File-level preflight against the archive's caps where the
 			// remote is configured; sizes for files that exist locally.
+			// The caps are the remote's stored (probed or hand-edited) ones
+			// — newArchiveBackend overlays them (issue #20).
 			maxFiles, maxSize := 0, int64(0)
-			if bk, _, err := resolveArchive(ds, m); err == nil {
+			if bk, r, err := resolveArchive(ds, m); err == nil {
 				caps := bk.Capabilities()
 				maxFiles, maxSize = caps.MaxFilesPerRecord, caps.MaxFileSize
+				// A resource_type outside the instance's own vocabulary is
+				// what publish would reject; only a probed vocabulary can
+				// say so (an unprobed remote produces no issue).
+				if r.Caps != nil {
+					issues = append(issues, meta.CheckResourceType(ds.Metadata.ResourceType, r.Caps.ResourceTypes)...)
+				}
 			}
 			_, sizes, _, err := datasetLocalState(repoRoot, ds)
 			if err != nil {

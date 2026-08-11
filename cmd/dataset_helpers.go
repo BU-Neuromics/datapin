@@ -46,11 +46,15 @@ type pingable interface {
 }
 
 // newArchiveBackend constructs the driver for a configured remote's kind —
-// the one registry both resolveArchive and `remote add` use.
+// the one registry both resolveArchive and `remote add` use. A remote's
+// stored caps (probed at `remote add` time, or hand-edited under
+// `[remotes.<name>.caps]`) overlay the driver's own profile here, so no
+// command re-probes at runtime (issue #20, D53).
 func newArchiveBackend(r config.Remote, token string) (backend.Backend, error) {
 	switch r.Kind {
 	case "invenio":
-		return invenio.New(r.URL, token)
+		return invenio.New(r.URL, token,
+			invenio.WithCaps(r.Caps.Apply(invenio.DefaultCaps(r.URL))))
 	case "figshare":
 		return figshare.New(r.URL, token)
 	case "dataverse":

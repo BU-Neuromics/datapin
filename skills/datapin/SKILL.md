@@ -132,6 +132,7 @@ var → keychain → token file.
 ```bash
 datapin remote add <url> --name <name> [--kind invenio|figshare|dataverse] [--token-value <tok>] [--no-verify] [--no-keychain]
 datapin remote ls [--output=json]        # list remotes and whether each has a token
+datapin remote probe <name>              # re-probe an archive remote's capabilities
 datapin remote rm <name>                 # remove a remote and its stored token
 ```
 
@@ -139,7 +140,28 @@ Kinds: `invenio` (Zenodo and any InvenioRDM instance), `figshare`
 (per-version .vN DOIs, no files-import), `dataverse` (one DOI for all
 versions; a collection alias may ride on the URL as
 https://host/dataverse/<alias>, default root). `remote add` probes the
-URL to confirm it answers like the expected API (`--no-verify` skips). Zenodo sandbox
+URL to confirm it answers like the expected API (`--no-verify` skips).
+
+**Per-instance capabilities (InvenioRDM).** The probe also records what the
+instance declares about itself under `[remotes.<name>.caps]` in
+config.toml, so no later command re-probes:
+
+- `resource_types` — the instance's resource-type vocabulary. `datapin
+  check` errors when a dataset's `resource_type` is not in it (publishing
+  would be rejected).
+- `multipart_upload` — inferred from the file schema the instance serves
+  (pre-InvenioRDM-v13 instances have no multipart transfer). Absent when
+  it could not be determined.
+- `max_files_per_record` / `max_file_size` — **not** exposed by the
+  InvenioRDM API, so they are absent by default and datapin uses the
+  documented Zenodo profile (100 files, 50 GB). Add them to the caps table
+  by hand to match an institutional instance's real limits.
+
+`datapin remote probe <name>` re-probes in place (a vocabulary that grew,
+or a remote added with `--no-verify`); a failed probe leaves the stored
+values untouched. Hand-edited values always win over the defaults.
+
+Zenodo sandbox
 (https://sandbox.zenodo.org) and production (https://zenodo.org) are
 separate services with separate accounts and tokens — add both as remotes
 when rehearsing a publish. Sandbox DOIs (prefix `10.5072`) do not resolve.

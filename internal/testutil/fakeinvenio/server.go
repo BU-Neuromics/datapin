@@ -18,6 +18,15 @@
 // parts is rejected; after commit the transfer type flips to "L"; storage-
 // specific minimums (e.g. S3's 5 MiB part floor) are NOT modeled. Treat the
 // first live multipart run as a verification spike.
+//
+// Introspection surface (issue #20, D54), live-verified against zenodo.org
+// and inveniordm.web.cern.ch: the paginated resource-type vocabulary
+// (`ResourceTypes`, `VocabularyStatus`), an anonymous published-record
+// search, and the file listing's `transfer` object whose absence marks a
+// pre-v13 instance (`LegacyFileSchema`). `RejectMultipart` models the
+// DOCUMENTED 400 an instance returns for an unregistered transfer type.
+// Nothing here serves instance limits or a config endpoint — real
+// InvenioRDM exposes neither.
 package fakeinvenio
 
 import (
@@ -63,6 +72,22 @@ type Server struct {
 	// "multipart:{etag}-{part_size}" placeholder instead of an md5 —
 	// modeling the documented asynchronous checksum recomputation.
 	AsyncMultipartChecksum bool
+	// ResourceTypes is the instance's resource-type vocabulary (the probe
+	// target of issue #20). Institutional instances curate their own.
+	ResourceTypes []string
+	// VocabularyStatus, when non-zero and not 200, makes the vocabulary
+	// endpoint fail with that status — a host that does not answer like
+	// InvenioRDM at all.
+	VocabularyStatus int
+	// LegacyFileSchema serves the pre-InvenioRDM-v13 file shape: no
+	// `transfer` object, only the legacy `storage_class` (an instance whose
+	// invenio-records-resources predates pluggable transfers, so the
+	// multipart `M` transfer cannot exist — D54).
+	LegacyFileSchema bool
+	// RejectMultipart makes an `M` registration fail the way an instance
+	// that never registered the multipart transfer does: HTTP 400 with the
+	// OneOfSchema message "Unsupported value: M" on transfer.type.
+	RejectMultipart bool
 
 	requests []string
 }
@@ -101,6 +126,8 @@ func New(token string) *Server {
 		records:  map[string]*record{},
 		concepts: map[string][]string{},
 		MaxFiles: 100,
+		// Zenodo's own vocabulary, abridged.
+		ResourceTypes: []string{"dataset", "software", "publication"},
 	}
 	s.ts = httptest.NewServer(http.HandlerFunc(s.route))
 	return s
@@ -193,13 +220,12 @@ func (s *Server) route(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case path == "/api/records" && r.Method == "POST":
 		s.createDraft(w, r)
+	case path == "/api/records" && r.Method == "GET":
+		s.searchRecords(w)
 	case path == "/api/user/records" && r.Method == "GET":
 		s.userRecords(w, r)
 	case path == "/api/vocabularies/resourcetypes" && r.Method == "GET":
-		writeJSON(w, 200, map[string]any{"hits": map[string]any{
-			"hits":  []any{map[string]any{"id": "dataset"}, map[string]any{"id": "software"}, map[string]any{"id": "publication"}},
-			"total": 3,
-		}})
+		s.resourceTypes(w, r)
 	case strings.HasPrefix(path, "/api/records/"):
 		s.recordRoute(w, r, strings.TrimPrefix(path, "/api/records/"))
 	default:
@@ -363,6 +389,20 @@ func (s *Server) registerFiles(w http.ResponseWriter, r *http.Request, rec *reco
 	for _, e := range entries {
 		if e.Transfer.Type != "M" {
 			continue
+		}
+		// An instance that never registered the multipart transfer rejects
+		// the type at schema validation (marshmallow OneOfSchema), before
+		// any provider check — DOCUMENTED-only (invenio-records-resources
+		// services/files/schema.py), see D55.
+		if s.RejectMultipart {
+			writeJSON(w, 400, map[string]any{
+				"status":  400,
+				"message": "A validation error occurred.",
+				"errors": []any{map[string]any{
+					"field": "transfer.type", "messages": []any{"Unsupported value: M"},
+				}},
+			})
+			return
 		}
 		switch {
 		case e.Transfer.Parts <= 0:
@@ -628,6 +668,78 @@ func (s *Server) versionsList(w http.ResponseWriter, rec *record) {
 	writeJSON(w, 200, map[string]any{"hits": map[string]any{"hits": hits, "total": len(hits)}})
 }
 
+// searchRecords is the anonymous published-record search (`GET
+// /api/records`). Only the ids matter to datapin: it is how the probe finds
+// a public record whose file listing reveals whether the instance serves
+// the pluggable-transfer file schema (D54).
+func (s *Server) searchRecords(w http.ResponseWriter) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var ids []string
+	for id, rec := range s.records {
+		if rec.published {
+			ids = append(ids, id)
+		}
+	}
+	sort.Strings(ids)
+	hits := make([]any, 0, len(ids))
+	for _, id := range ids {
+		hits = append(hits, s.recordJSON(s.records[id], false))
+	}
+	writeJSON(w, 200, map[string]any{"hits": map[string]any{"hits": hits, "total": len(hits)}})
+}
+
+// resourceTypes serves the instance's resource-type vocabulary the way
+// Invenio's search REST layer does: `size` (default 25) + 1-based `page`,
+// a `hits.total` count, and a `links.next` while more pages remain. This is
+// the one introspection endpoint an InvenioRDM instance genuinely exposes
+// about itself (issue #20, D54) — `ResourceTypes` varies it per test, and
+// `VocabularyStatus` makes it fail like a non-InvenioRDM host.
+func (s *Server) resourceTypes(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	ids := append([]string(nil), s.ResourceTypes...)
+	status := s.VocabularyStatus
+	s.mu.Unlock()
+	if status != 0 && status != 200 {
+		jsonError(w, status, "Not found.")
+		return
+	}
+
+	size := 25
+	if v := r.URL.Query().Get("size"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			size = n
+		}
+	}
+	page := 1
+	if v := r.URL.Query().Get("page"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			page = n
+		}
+	}
+	start := (page - 1) * size
+	end := start + size
+	if start > len(ids) {
+		start = len(ids)
+	}
+	if end > len(ids) {
+		end = len(ids)
+	}
+	hits := make([]any, 0, end-start)
+	for _, id := range ids[start:end] {
+		// Real entries carry title/props too; only `id` matters here.
+		hits = append(hits, map[string]any{"id": id, "title": map[string]any{"en": id}})
+	}
+	links := map[string]any{"self": r.URL.String()}
+	if end < len(ids) {
+		links["next"] = fmt.Sprintf("%s/api/vocabularies/resourcetypes?size=%d&page=%d", s.URL(), size, page+1)
+	}
+	writeJSON(w, 200, map[string]any{
+		"hits":  map[string]any{"hits": hits, "total": len(ids)},
+		"links": links,
+	})
+}
+
 func (s *Server) userRecords(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -733,12 +845,18 @@ func (s *Server) filesJSON(rec *record) map[string]any {
 func (s *Server) fileJSON(rec *record, f *file) map[string]any {
 	self := s.ts.URL + "/api/records/" + rec.id + "/draft/files/" + f.key
 	j := map[string]any{
-		"key":      f.key,
-		"status":   map[bool]string{true: "completed", false: "pending"}[f.committed],
-		"transfer": map[string]any{"type": f.transfer},
+		"key":    f.key,
+		"status": map[bool]string{true: "completed", false: "pending"}[f.committed],
 		"links": map[string]any{
 			"self": self, "content": self + "/content", "commit": self + "/commit",
 		},
+	}
+	if s.LegacyFileSchema {
+		// Pre-v13: only the legacy storage_class, no transfer object.
+		j["storage_class"] = f.transfer
+	} else {
+		j["transfer"] = map[string]any{"type": f.transfer}
+		j["storage_class"] = f.transfer
 	}
 	if f.committed {
 		j["checksum"] = f.checksum

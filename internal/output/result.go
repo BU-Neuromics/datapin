@@ -202,6 +202,31 @@ type RemoteAddResult struct {
 	URL         string `json:"url"`
 	Sandbox     bool   `json:"sandbox"`
 	TokenStored bool   `json:"token_stored"`
+	// Caps is what the instance declared when probed (null under
+	// --no-verify, or when it declared nothing); ProbeNotes explains which
+	// capabilities fell back to datapin's defaults.
+	Caps       *RemoteCapsResult `json:"caps"`
+	ProbeNotes []string          `json:"probe_notes,omitempty"`
+}
+
+// RemoteCapsResult is the probed/stored capability set of one remote.
+// Absent fields (0 / null) mean the instance's API exposes nothing there
+// and the driver's documented default applies (issue #20).
+type RemoteCapsResult struct {
+	ProbedAt          string   `json:"probed_at,omitempty"`
+	MaxFilesPerRecord int      `json:"max_files_per_record"`
+	MaxFileSize       int64    `json:"max_file_size"`
+	MultipartUpload   *bool    `json:"multipart_upload"`
+	ResourceTypes     []string `json:"resource_types,omitempty"`
+}
+
+// RemoteProbeResult is emitted by `datapin remote probe --output=json`.
+type RemoteProbeResult struct {
+	Name       string            `json:"name"`
+	Kind       string            `json:"kind"`
+	URL        string            `json:"url"`
+	Caps       *RemoteCapsResult `json:"caps"`
+	ProbeNotes []string          `json:"probe_notes,omitempty"`
 }
 
 // RemoteListEntry is one row of `datapin remote ls --output=json`.

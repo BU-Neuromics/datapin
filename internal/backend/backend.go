@@ -156,6 +156,32 @@ type Caps struct {
 	Sandbox           bool // test instance minting non-resolving DOIs (10.5072)
 }
 
+// ProbeResult is what one instance declared about itself when probed
+// (`datapin remote add`, issue #20). Every field is optional: a zero value
+// means the API exposed nothing, and the driver's own profile stands. Never
+// guess here — an invented limit is worse than a documented default (D54).
+type ProbeResult struct {
+	// ResourceTypes are the instance's resource-type vocabulary ids
+	// (InvenioRDM: GET /api/vocabularies/resourcetypes). Nil when the
+	// instance serves no such vocabulary.
+	ResourceTypes []string
+	// MaxFilesPerRecord / MaxFileSize are 0 unless the API states a limit.
+	MaxFilesPerRecord int
+	MaxFileSize       int64
+	// MultipartUpload is nil unless the API declares its transfer types.
+	MultipartUpload *bool
+	// Notes are human-readable lines about what could NOT be probed and
+	// what default therefore applies. They are shown, not stored.
+	Notes []string
+}
+
+// Prober is implemented by drivers that can derive per-instance
+// capabilities. `remote add` probes once and persists the result, so
+// runtime never re-probes.
+type Prober interface {
+	Probe(ctx context.Context) (ProbeResult, error)
+}
+
 // Backend is the least-common-denominator surface every archive repository
 // implements (plan §4.2).
 type Backend interface {

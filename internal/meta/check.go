@@ -159,6 +159,38 @@ func CheckFiles(files []manifest.DatasetFile, sizes map[string]int64, maxFiles i
 	return issues
 }
 
+// CheckResourceType validates a dataset's resource_type against the target
+// instance's own vocabulary, as probed when the remote was added (issue
+// #20). vocab is the probed id list; an empty vocab means nothing was
+// probed (--no-verify, or a backend that exposes no vocabulary) and
+// produces no issues — datapin never invents a vocabulary. A blank
+// resource_type is defaulted at publish time, not here.
+func CheckResourceType(resourceType string, vocab []string) []Issue {
+	rt := strings.TrimSpace(resourceType)
+	if rt == "" || len(vocab) == 0 {
+		return nil
+	}
+	for _, id := range vocab {
+		if strings.EqualFold(id, rt) {
+			return nil
+		}
+	}
+	return []Issue{{Error, "resource_type", fmt.Sprintf(
+		"%q is not in the archive instance's resource-type vocabulary (%s) — "+
+			"publishing would be rejected; refresh the vocabulary with 'datapin remote probe <name>' if the instance has changed",
+		rt, summarizeVocab(vocab))}}
+}
+
+// summarizeVocab renders a vocabulary for an error message, truncated so a
+// 40-entry instance vocabulary does not bury the message.
+func summarizeVocab(vocab []string) string {
+	const max = 8
+	if len(vocab) <= max {
+		return strings.Join(vocab, ", ")
+	}
+	return fmt.Sprintf("%s, … (%d total)", strings.Join(vocab[:max], ", "), len(vocab))
+}
+
 // NormalizeORCID returns the bare 0000-0000-0000-000X form, or "" when
 // the input is not a valid ORCID. Accepts the https://orcid.org/ URL form.
 func NormalizeORCID(s string) string {
