@@ -16,11 +16,21 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/BU-Neuromics/datapin/internal/backend"
 	"github.com/BU-Neuromics/datapin/internal/httpx"
+	"github.com/BU-Neuromics/datapin/internal/log"
+)
+
+// defaultMultipartThreshold and defaultPartSize gate and shape multipart
+// (`M` transfer) uploads: files larger than the threshold upload in
+// part-size chunks (issue #19, D43).
+const (
+	defaultMultipartThreshold = 100 << 20 // 100 MiB
+	defaultPartSize           = 100 << 20 // 100 MiB
 )
 
 // Client talks to one InvenioRDM instance.
@@ -29,6 +39,12 @@ type Client struct {
 	token string
 	http  *httpx.RetryClient
 	caps  backend.Caps
+
+	// multipartThreshold: files strictly larger than this upload via the
+	// multipart `M` transfer; partSize is the size of every non-final part.
+	// Both are injectable (tests, and the live tier's cheap-multipart run).
+	multipartThreshold int64
+	partSize           int64
 }
 
 // Option customizes a Client.
@@ -39,6 +55,17 @@ func WithHTTP(rc *httpx.RetryClient) Option {
 	return func(c *Client) { c.http = rc }
 }
 
+// WithMultipartThreshold sets the size above which uploads switch to the
+// multipart `M` transfer.
+func WithMultipartThreshold(n int64) Option {
+	return func(c *Client) { c.multipartThreshold = n }
+}
+
+// WithPartSize sets the multipart part size.
+func WithPartSize(n int64) Option {
+	return func(c *Client) { c.partSize = n }
+}
+
 // New returns a Client for the instance at baseURL. Pass an empty token for
 // anonymous access (published-record reads only).
 func New(baseURL, token string, opts ...Option) (*Client, error) {
@@ -47,10 +74,12 @@ func New(baseURL, token string, opts ...Option) (*Client, error) {
 		return nil, fmt.Errorf("invalid backend URL %q", baseURL)
 	}
 	c := &Client{
-		base:  strings.TrimSuffix(baseURL, "/"),
-		token: token,
-		http:  httpx.New(&http.Client{Timeout: 60 * time.Second}),
-		caps:  zenodoCaps(u.Host),
+		base:               strings.TrimSuffix(baseURL, "/"),
+		token:              token,
+		http:               httpx.New(&http.Client{Timeout: 60 * time.Second}),
+		caps:               zenodoCaps(u.Host),
+		multipartThreshold: defaultMultipartThreshold,
+		partSize:           defaultPartSize,
 	}
 	for _, o := range opts {
 		o(c)
@@ -153,10 +182,19 @@ type fileJSON struct {
 	Checksum string      `json:"checksum"`
 	Size     json.Number `json:"size"`
 	Links    struct {
-		Content string `json:"content"`
-		Commit  string `json:"commit"`
-		Self    string `json:"self"`
+		Content string     `json:"content"`
+		Commit  string     `json:"commit"`
+		Self    string     `json:"self"`
+		Parts   []partJSON `json:"parts"`
 	} `json:"links"`
+}
+
+// partJSON is one per-part upload URL from a multipart (`M`) registration
+// (fixture 39; the ~14-day expiration is ignored — URLs are used
+// immediately, see D43).
+type partJSON struct {
+	Part int    `json:"part"`
+	URL  string `json:"url"`
 }
 
 func (f *fileJSON) toFileInfo() backend.FileInfo {
@@ -357,7 +395,12 @@ func (c *Client) UpdateMetadata(ctx context.Context, id backend.DraftID, meta ba
 // UploadFile implements backend.Backend: register → stream content →
 // commit → verify the server's checksum against the expected sum. The
 // upload PUT streams r directly (no buffering); it is not retried.
+// Files larger than the multipart threshold upload via the multipart `M`
+// transfer instead (uploadMultipart, D43).
 func (c *Client) UploadFile(ctx context.Context, id backend.DraftID, key string, r io.Reader, size int64, sum backend.Checksum) (backend.FileInfo, error) {
+	if size > c.multipartThreshold {
+		return c.uploadMultipart(ctx, id, key, r, size, sum)
+	}
 	var reg filesListJSON
 	err := c.doJSON(ctx, "POST", "/api/records/"+string(id)+"/draft/files",
 		[]map[string]any{{"key": key}}, &reg)
@@ -401,6 +444,117 @@ func (c *Client) UploadFile(ctx context.Context, id backend.DraftID, key string,
 		return fi, fmt.Errorf("%s: server checksum %s does not match local checksum %s — upload corrupted", key, fi.Checksum, sum)
 	}
 	return fi, nil
+}
+
+// uploadMultipart uploads key via the multipart `M` transfer (D43):
+// register with {type: "M", parts, part_size} → PUT each part to its
+// pre-authorized part URL → commit. Parts upload serially — the Backend
+// interface hands the driver a stream, not an io.ReaderAt. Any failure
+// after registration deletes the pending entry (with a cancellation-immune
+// context) so the draft stays publishable (D45). The part URLs' ~14-day
+// expirations are ignored: they are minted immediately before use, and a
+// crashed run's pending entry is cleared by publish preflight, never
+// resumed (D43).
+func (c *Client) uploadMultipart(ctx context.Context, id backend.DraftID, key string, r io.Reader, size int64, sum backend.Checksum) (backend.FileInfo, error) {
+	parts := int((size + c.partSize - 1) / c.partSize)
+	var reg filesListJSON
+	err := c.doJSON(ctx, "POST", "/api/records/"+string(id)+"/draft/files",
+		[]map[string]any{{
+			"key":      key,
+			"size":     size,
+			"transfer": map[string]any{"type": "M", "parts": parts, "part_size": c.partSize},
+		}}, &reg)
+	if err != nil {
+		return backend.FileInfo{}, fmt.Errorf("registering %s (multipart): %w", key, err)
+	}
+	var entry *fileJSON
+	for i := range reg.Entries {
+		if reg.Entries[i].Key == key {
+			entry = &reg.Entries[i]
+		}
+	}
+	if entry == nil {
+		return backend.FileInfo{}, fmt.Errorf("registering %s (multipart): entry missing from response", key)
+	}
+
+	// abort removes the registered entry so no pending upload is left to
+	// block publish. It must run even when ctx is already canceled, so it
+	// gets a fresh, bounded context.
+	abort := func() {
+		cctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+		defer cancel()
+		if derr := c.DeleteDraftFile(cctx, id, key); derr != nil {
+			log.Debugf("aborting multipart upload of %s: %v", key, derr)
+		}
+	}
+
+	links := append([]partJSON(nil), entry.Links.Parts...)
+	sort.Slice(links, func(i, j int) bool { return links[i].Part < links[j].Part })
+	if entry.Links.Commit == "" || len(links) != parts {
+		abort()
+		return backend.FileInfo{}, fmt.Errorf("registering %s (multipart): response carried %d part links, want %d", key, len(links), parts)
+	}
+	for i, pl := range links {
+		if pl.Part != i+1 || pl.URL == "" {
+			abort()
+			return backend.FileInfo{}, fmt.Errorf("registering %s (multipart): malformed part link %+v", key, pl)
+		}
+	}
+
+	for i, pl := range links {
+		n := c.partSize
+		if i == parts-1 {
+			n = size - int64(parts-1)*c.partSize
+		}
+		if err := c.putPart(ctx, pl.URL, io.LimitReader(r, n), n); err != nil {
+			abort()
+			return backend.FileInfo{}, fmt.Errorf("uploading part %d/%d of %s: %w", i+1, parts, key, err)
+		}
+	}
+
+	var committed fileJSON
+	if err := c.doJSON(ctx, "POST", entry.Links.Commit, nil, &committed); err != nil {
+		abort()
+		return backend.FileInfo{}, fmt.Errorf("committing %s: %w", key, err)
+	}
+	fi := committed.toFileInfo()
+	if fi.Checksum.Algo == "md5" {
+		if sum.Hex != "" && fi.Checksum != sum {
+			abort()
+			return fi, fmt.Errorf("%s: server checksum %s does not match local checksum %s — upload corrupted", key, fi.Checksum, sum)
+		}
+	} else {
+		// A multipart commit may report no checksum, or the
+		// "multipart:{etag}-{part_size}" placeholder InvenioRDM stores
+		// while it recomputes the real digest asynchronously. Surface no
+		// checksum rather than a wrong one (D44, the s3ws precedent) — the
+		// caller's manifest pin is the local MD5 either way.
+		fi.Checksum = backend.Checksum{}
+	}
+	return fi, nil
+}
+
+// putPart streams one multipart part. Like the single-file content PUT it
+// is not retried (the body is a stream).
+func (c *Client) putPart(ctx context.Context, url string, r io.Reader, n int64) error {
+	req, err := http.NewRequestWithContext(ctx, "PUT", url, r)
+	if err != nil {
+		return err
+	}
+	if c.token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+	req.Header.Set("Content-Type", "application/octet-stream")
+	req.ContentLength = n
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return err
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+	return nil
 }
 
 // DeleteDraftFile implements backend.Backend.
