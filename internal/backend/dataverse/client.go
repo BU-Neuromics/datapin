@@ -253,7 +253,10 @@ func datasetJSON(m backend.Metadata, lic map[string]any) map[string]any {
 		map[string]any{"typeName": "title", "multiple": false, "typeClass": "primitive", "value": m.Title},
 		map[string]any{"typeName": "author", "multiple": true, "typeClass": "compound", "value": authors},
 		map[string]any{"typeName": "datasetContact", "multiple": true, "typeClass": "compound", "value": []any{
-			map[string]any{"datasetContactName": field("datasetContactName", contactName)},
+			map[string]any{
+				"datasetContactName":  field("datasetContactName", contactName),
+				"datasetContactEmail": field("datasetContactEmail", m.ContactEmail),
+			},
 		}},
 		map[string]any{"typeName": "dsDescription", "multiple": true, "typeClass": "compound", "value": []any{
 			map[string]any{"dsDescriptionValue": field("dsDescriptionValue", descr)},
@@ -351,6 +354,14 @@ func controlledField(name, value string) map[string]any {
 // CreateDraft implements backend.Backend. The DOI (persistentId) is
 // reserved by creation itself.
 func (c *Client) CreateDraft(ctx context.Context, meta backend.Metadata) (backend.DraftID, error) {
+	// Dataverse requires a Point of Contact e-mail (live-verified 403
+	// otherwise), and datapin has none to invent — fail with the manifest
+	// key before anything is created on the instance.
+	if strings.TrimSpace(meta.ContactEmail) == "" {
+		return "", &backend.ValidationError{
+			Message: "Dataverse requires a contact e-mail (Point of Contact) — set contact_email in [datasets.metadata]",
+		}
+	}
 	lic, err := c.resolveLicense(ctx, meta.License)
 	if err != nil {
 		return "", err

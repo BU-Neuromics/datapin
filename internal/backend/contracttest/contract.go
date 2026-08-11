@@ -31,6 +31,7 @@ func testMeta(title string) backend.Metadata {
 		Publisher:       "Zenodo",
 		ResourceType:    "dataset",
 		License:         "CC0-1.0",
+		ContactEmail:    "contract@example.edu",
 		Keywords:        []string{"contract"},
 		Creators: []backend.Creator{
 			{FamilyName: "Suite", GivenName: "Contract"},

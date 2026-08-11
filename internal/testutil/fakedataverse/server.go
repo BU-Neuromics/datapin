@@ -118,6 +118,42 @@ var licenseRegistry = []map[string]any{
 	},
 }
 
+// contactEmail digs the first datasetContactEmail value out of a dataset
+// creation body ("" when absent).
+func contactEmail(body map[string]any) string {
+	dv, _ := body["datasetVersion"].(map[string]any)
+	blocks, _ := dv["metadataBlocks"].(map[string]any)
+	citation, _ := blocks["citation"].(map[string]any)
+	fields, _ := citation["fields"].([]any)
+	for _, f := range fields {
+		fm, _ := f.(map[string]any)
+		if fm["typeName"] != "datasetContact" {
+			continue
+		}
+		contacts, _ := fm["value"].([]any)
+		for _, ct := range contacts {
+			cm, _ := ct.(map[string]any)
+			email, _ := cm["datasetContactEmail"].(map[string]any)
+			if v, _ := email["value"].(string); v != "" {
+				return v
+			}
+		}
+	}
+	return ""
+}
+
+// DatasetContactEmail returns the contact e-mail a dataset was created
+// with (assertion hook for driver tests).
+func (s *Server) DatasetContactEmail(pid string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	d := s.datasets[pid]
+	if d == nil {
+		return ""
+	}
+	return contactEmail(d.meta)
+}
+
 // DatasetLicense returns the license object a dataset was created with,
 // nil when none was sent (assertion hook for driver tests).
 func (s *Server) DatasetLicense(pid string) map[string]any {
@@ -198,6 +234,12 @@ func (s *Server) createDataset(w http.ResponseWriter, r *http.Request) {
 	}
 	if msg := validateLicense(body); msg != "" {
 		fail(w, 400, msg)
+		return
+	}
+	// Live-verified (demo 6.11): dataset creation without a Point of
+	// Contact e-mail fails with HTTP 403.
+	if contactEmail(body) == "" {
+		fail(w, 403, "Validation Failed: Point of Contact E-mail is required.")
 		return
 	}
 	s.nextID++

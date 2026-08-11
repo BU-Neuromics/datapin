@@ -104,12 +104,15 @@ type DatasetFile struct {
 // `datapin check`; enforced only when publishing — a metadata-less dataset
 // is valid while unpublished, plan §4.7).
 type DatasetMetadata struct {
-	Title        string           `toml:"title,omitempty"`
-	Description  string           `toml:"description,omitempty"`
-	License      string           `toml:"license,omitempty"`
-	Keywords     []string         `toml:"keywords,omitempty"`
-	ResourceType string           `toml:"resource_type,omitempty"`
-	Publisher    string           `toml:"publisher,omitempty"`
+	Title        string   `toml:"title,omitempty"`
+	Description  string   `toml:"description,omitempty"`
+	License      string   `toml:"license,omitempty"`
+	Keywords     []string `toml:"keywords,omitempty"`
+	ResourceType string   `toml:"resource_type,omitempty"`
+	Publisher    string   `toml:"publisher,omitempty"`
+	// ContactEmail is the dataset's point of contact. Dataverse requires
+	// it to create a dataset; other backends ignore it.
+	ContactEmail string           `toml:"contact_email,omitempty"`
 	Creators     []DatasetCreator `toml:"creators,omitempty"`
 	Related      []RelatedID      `toml:"related,omitempty"`
 }

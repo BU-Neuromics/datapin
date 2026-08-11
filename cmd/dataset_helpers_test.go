@@ -43,6 +43,15 @@ func TestPublishPreflight_RequiresLicense(t *testing.T) {
 	}
 }
 
+// contact_email reaches the backend metadata (Dataverse requires it).
+func TestDatasetBackendMetadata_CarriesContactEmail(t *testing.T) {
+	ds := publishReadyDataset()
+	ds.Metadata.ContactEmail = "pi@example.edu"
+	if got := datasetBackendMetadata(ds).ContactEmail; got != "pi@example.edu" {
+		t.Fatalf("ContactEmail = %q", got)
+	}
+}
+
 // The confirmation plan shows the license next to the PUBLIC/PERMANENT
 // warning — the choice must be visible at the moment of consent.
 func TestPrintPublishPlan_ShowsLicense(t *testing.T) {

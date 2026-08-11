@@ -29,6 +29,7 @@ func licenseMeta(license string) backend.Metadata {
 		Publisher:       "datapin tests",
 		License:         license,
 		ResourceType:    "dataset",
+		ContactEmail:    "pi@example.edu",
 		Creators:        []backend.Creator{{FamilyName: "Tester", GivenName: "Trusty"}},
 	}
 }
