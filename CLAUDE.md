@@ -96,7 +96,12 @@ in `docs/decisions.md`). OSF workspace sync above is untouched (D12).
   errors[]}` shape) and `NotFoundError`.
 - `internal/backend/invenio` — the Zenodo/InvenioRDM driver. Key rules:
   three-step upload (register → PUT content → commit) with server-checksum
-  verification; DOIs read defensively from both legacy and RDM response
+  verification; files over a 100 MiB threshold use the multipart `M`
+  transfer instead (serial parts to the pre-authorized part URLs; any
+  failure deletes the pending entry so the draft stays publishable; the
+  commit checksum is verified only when it is an md5 — D43–D45, threshold
+  and part size injectable via `WithMultipartThreshold`/`WithPartSize`);
+  DOIs read defensively from both legacy and RDM response
   shapes (D19); publish is never blind-retried on 5xx — it reconciles by
   re-GET because publish can 504 while succeeding (zenodo#2131, D18);
   download verification uses the `oc-checksum` header, whose MD5 hex
