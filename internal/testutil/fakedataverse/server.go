@@ -12,6 +12,12 @@
 //     :publish?type=major releases it as the next x.0 version
 //   - one DOI for all versions (no per-version DOIs)
 //   - the {status, data|message} response envelope
+//   - the per-instance license registry (/api/licenses) and rejection of
+//     unregistered license names on dataset creation — LIVE-VERIFIED
+//     against demo.dataverse.org 6.11 (2026-08-11): a raw SPDX id fails
+//     with "Error parsing Json: Invalid or unsupported license: …", and
+//     the registry's CC0 entry carries the SPDX rightsIdentifier
+//     crosswalk while the CC BY entries do not
 package fakedataverse
 
 import (
@@ -89,6 +95,43 @@ func (s *Server) PublishedCount() int {
 	return n
 }
 
+// licenseRegistry mirrors demo.dataverse.org's /api/licenses shape: the
+// CC0 entry carries the SPDX rightsIdentifier crosswalk, the CC BY
+// entries do not (matching the live instance, where only some entries
+// have it).
+var licenseRegistry = []map[string]any{
+	{
+		"id": 1, "name": "CC0 1.0",
+		"uri":    "http://creativecommons.org/publicdomain/zero/1.0",
+		"active": true, "isDefault": true,
+		"rightsIdentifier": "CC0-1.0", "rightsIdentifierScheme": "SPDX",
+	},
+	{
+		"id": 13, "name": "CC BY 4.0",
+		"uri":    "http://creativecommons.org/licenses/by/4.0",
+		"active": true, "isDefault": false,
+	},
+	{
+		"id": 9, "name": "CC BY-SA 4.0",
+		"uri":    "http://creativecommons.org/licenses/by-sa/4.0",
+		"active": true, "isDefault": false,
+	},
+}
+
+// DatasetLicense returns the license object a dataset was created with,
+// nil when none was sent (assertion hook for driver tests).
+func (s *Server) DatasetLicense(pid string) map[string]any {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	d := s.datasets[pid]
+	if d == nil {
+		return nil
+	}
+	dv, _ := d.meta["datasetVersion"].(map[string]any)
+	lic, _ := dv["license"].(map[string]any)
+	return lic
+}
+
 func ok(w http.ResponseWriter, data any) {
 	writeJSON(w, 200, map[string]any{"status": "OK", "data": data})
 }
@@ -115,10 +158,13 @@ func (s *Server) route(w http.ResponseWriter, r *http.Request) {
 	}
 	parts = parts[1:]
 
-	// Anonymous: info + published reads + downloads.
+	// Anonymous: info + licenses + published reads + downloads.
 	switch {
 	case parts[0] == "info":
 		ok(w, map[string]any{"version": "6.3", "build": "fake"})
+		return
+	case parts[0] == "licenses" && len(parts) == 1 && r.Method == "GET":
+		ok(w, licenseRegistry)
 		return
 	case parts[0] == "access" && len(parts) == 3 && parts[1] == "datafile":
 		s.download(w, parts[2])
@@ -150,6 +196,10 @@ func (s *Server) createDataset(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "malformed dataset JSON")
 		return
 	}
+	if msg := validateLicense(body); msg != "" {
+		fail(w, 400, msg)
+		return
+	}
 	s.nextID++
 	d := &dataset{
 		id:    s.nextID,
@@ -160,6 +210,34 @@ func (s *Server) createDataset(w http.ResponseWriter, r *http.Request) {
 	s.datasets[d.pid] = d
 	s.byID[d.id] = d
 	ok(w, map[string]any{"id": d.id, "persistentId": d.pid})
+}
+
+// validateLicense enforces the registry the way real Dataverse does
+// (live-verified error text): a license, when present, must name a
+// registered entry exactly.
+func validateLicense(body map[string]any) string {
+	dv, _ := body["datasetVersion"].(map[string]any)
+	if dv == nil {
+		return ""
+	}
+	lic, present := dv["license"]
+	if !present {
+		return ""
+	}
+	m, isMap := lic.(map[string]any)
+	if !isMap {
+		return fmt.Sprintf("Error parsing Json: Invalid or unsupported license: %v", lic)
+	}
+	name, _ := m["name"].(string)
+	for _, entry := range licenseRegistry {
+		if entry["name"] == name && entry["active"] == true {
+			if uri, ok := m["uri"].(string); ok && uri != "" && uri != entry["uri"] {
+				return fmt.Sprintf("Error parsing Json: Invalid or unsupported license: %s", uri)
+			}
+			return ""
+		}
+	}
+	return fmt.Sprintf("Error parsing Json: Invalid or unsupported license: %s", name)
 }
 
 func (s *Server) destroyDataset(w http.ResponseWriter, idStr string) {

@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -166,7 +167,9 @@ func publishOne(ctx context.Context, m *manifest.Manifest, manifestPath, repoRoo
 		return zero, nil
 	}
 
-	printPublishPlan(ds, remote.Name, remote.URL, plan, sizes, published, latestNum, bk.Capabilities().Sandbox)
+	if flagOutput != "json" {
+		printPublishPlan(os.Stderr, ds, remote.Name, remote.URL, plan, sizes, published, latestNum, bk.Capabilities().Sandbox)
+	}
 
 	if publishDryRun {
 		zero.State = "DRY_RUN"
@@ -376,11 +379,7 @@ func repinDataset(ds *manifest.Dataset, rec backend.Record, latestNum int, local
 }
 
 // printPublishPlan renders the loud, DOI-consequence-explicit plan.
-func printPublishPlan(ds *manifest.Dataset, remoteName, remoteURL string, plan []datasetPlanEntry, sizes map[string]int64, published bool, latestNum int, sandbox bool) {
-	if flagOutput == "json" {
-		return
-	}
-	w := os.Stderr
+func printPublishPlan(w io.Writer, ds *manifest.Dataset, remoteName, remoteURL string, plan []datasetPlanEntry, sizes map[string]int64, published bool, latestNum int, sandbox bool) {
 	fmt.Fprintf(w, "\nDataset %q → remote %q (%s)\n", ds.Slug, remoteName, remoteURL)
 	if published {
 		fmt.Fprintf(w, "  action: publish version %d (a NEW version DOI will be minted)\n", latestNum+1)
@@ -388,6 +387,7 @@ func printPublishPlan(ds *manifest.Dataset, remoteName, remoteURL string, plan [
 		fmt.Fprintf(w, "  action: first publish (a concept DOI and version DOI will be minted)\n")
 	}
 	fmt.Fprintf(w, "  %s\n", output.Bold("PUBLIC AND PERMANENT: published versions cannot be edited or deleted."))
+	fmt.Fprintf(w, "  license: %s (granted to the public on every file in this version)\n", ds.Metadata.License)
 	if sandbox {
 		fmt.Fprintf(w, "  (sandbox remote — DOIs will use the non-resolving 10.5072 test prefix)\n")
 	}

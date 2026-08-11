@@ -154,6 +154,27 @@ func TestPublish_JSONRequiresYes(t *testing.T) {
 	}
 }
 
+// A missing license is only a warning for `check`, but publish must
+// refuse: otherwise the backend applies its own default license and the
+// user grants rights they never chose (D37).
+func TestPublish_MissingLicenseRefused(t *testing.T) {
+	e := newInvenioEnv(t)
+	e.setupDataset(t)
+	p := filepath.Join(e.dir, ".datapin", "datapin.toml")
+	data, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stripped := strings.ReplaceAll(string(data), "license = \"CC0-1.0\"", "")
+	if err := os.WriteFile(p, []byte(stripped), 0644); err != nil {
+		t.Fatal(err)
+	}
+	_, stderr, code := e.run("publish", "counts", "--yes")
+	if code == 0 || !strings.Contains(stderr, "license") {
+		t.Fatalf("publish without license: code=%d stderr=%s", code, stderr)
+	}
+}
+
 func TestPublish_MissingMetadataRefused(t *testing.T) {
 	e := newInvenioEnv(t)
 	e.setupDataset(t)
