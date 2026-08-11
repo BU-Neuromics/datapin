@@ -1,6 +1,6 @@
 ---
 name: datapin
-description: "Use when working with the Open Science Framework (OSF) for research data management. Invoke when: the project contains a .datapin/datapin.toml manifest (or a legacy .gosf/gosf.toml from datapin's previous life as gosf); the user mentions OSF, osf.io, or osfclient; the task involves syncing, pushing, or pulling research data files with an OSF project; the task involves an OSF project wiki or its markdown pages; or you need to inspect, manage, or automate files stored in OSF Storage. Covers the full datapin CLI: manifest management (datapin init / add / status / sync), file transfer (datapin pull / push / rm), storage management (datapin mkdir / mv / cp), project navigation (datapin ls / info / projects / versions / open / set), project wikis (datapin wiki ls / get / push / rm / mv / versions / open / add), authentication (datapin auth), archive remotes for FAIR data publication to Zenodo/InvenioRDM (datapin remote add / ls / rm), and DOI-minting dataset publication (datapin publish)."
+description: "Use when working with the Open Science Framework (OSF) for research data management. Invoke when: the project contains a .datapin/datapin.toml manifest (or a legacy .gosf/gosf.toml from datapin's previous life as gosf); the user mentions OSF, osf.io, or osfclient; the task involves syncing, pushing, or pulling research data files with an OSF project; the task involves an OSF project wiki or its markdown pages; or you need to inspect, manage, or automate files stored in OSF Storage. Covers the full datapin CLI: manifest management (datapin init / add / status / sync), file transfer (datapin pull / push / rm), storage management (datapin mkdir / mv / cp), project navigation (datapin ls / info / projects / versions / open / set), project wikis (datapin wiki ls / get / push / rm / mv / versions / open / add), authentication (datapin auth), archive remotes for FAIR data publication to Zenodo/InvenioRDM (datapin remote add / ls / rm), DOI-minting dataset publication (datapin publish), metadata linting and FAIR assessment (datapin check), standard metadata export (datapin export), and citations (datapin cite)."
 metadata:
   version: "0.1.0"
 ---
@@ -164,6 +164,19 @@ datapin pull <slug> [--latest]           # fetch published bytes (pinned version
 - Publishing needs metadata: at minimum `title` and one `creators` entry in
   `[datasets.metadata]` (name = "Family, Given"). License and keywords are
   strongly recommended (CC0-1.0 suggested for data).
+
+Metadata quality and standard exports:
+
+```bash
+datapin check [<slug>] [--fair]          # lint metadata: DataCite floor, SPDX, ORCID checksums, relation types; exit 1 on errors
+datapin export <slug> [--datapackage] [--ro-crate] [--dir <path>]  # write datapackage.json / ro-crate-metadata.json (default: both)
+datapin cite <slug> [--bibtex]           # paste-ready citation via DOI content negotiation (local fallback for sandbox DOIs)
+```
+
+`check` errors are exactly what `publish` refuses; warnings are FAIR
+nudges (missing description/keywords/ORCIDs, NC/ND licenses). `check
+--fair` runs an F-UJI assessment of the published DOI (needs a resolving,
+non-sandbox DOI; configure `DATAPIN_FUJI_URL`/`_USER`/`_PASS`).
 
 Manifest shape:
 

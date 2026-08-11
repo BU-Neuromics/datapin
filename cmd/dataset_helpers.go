@@ -11,7 +11,9 @@ import (
 	"github.com/BU-Neuromics/datapin/internal/backend"
 	"github.com/BU-Neuromics/datapin/internal/backend/invenio"
 	"github.com/BU-Neuromics/datapin/internal/config"
+	"github.com/BU-Neuromics/datapin/internal/log"
 	"github.com/BU-Neuromics/datapin/internal/manifest"
+	"github.com/BU-Neuromics/datapin/internal/meta"
 )
 
 // resolveArchive returns a connected backend for the dataset's archive
@@ -131,18 +133,28 @@ func splitCreatorName(name string) (family, given string) {
 	return name, ""
 }
 
-// publishPreflight validates what Phase 2's `datapin check` will lint in
-// depth: the publish boundary needs at least a title and one creator
-// (DataCite floor) and at least one file.
+// publishPreflight enforces metadata completeness at the publish boundary
+// (plan §4.7 — only there): meta.Check errors block the publish, warnings
+// are surfaced and the publish proceeds.
 func publishPreflight(ds *manifest.Dataset) error {
 	if len(ds.Files) == 0 {
 		return fmt.Errorf("dataset %q has no files — add some under [[datasets.files]]", ds.Slug)
 	}
-	if ds.Metadata.Title == "" {
-		return fmt.Errorf("dataset %q has no metadata.title — a published record needs one (set [datasets.metadata] title)", ds.Slug)
+	issues := meta.Check(ds.Metadata)
+	for _, i := range issues {
+		if i.Severity == meta.Warning {
+			log.Warnf("dataset %q metadata: %s: %s", ds.Slug, i.Field, i.Message)
+		}
 	}
-	if len(ds.Metadata.Creators) == 0 {
-		return fmt.Errorf("dataset %q has no creators — add [[datasets.metadata.creators]] with name = \"Family, Given\"", ds.Slug)
+	if meta.HasErrors(issues) {
+		var msgs []string
+		for _, i := range issues {
+			if i.Severity == meta.Error {
+				msgs = append(msgs, fmt.Sprintf("%s: %s", i.Field, i.Message))
+			}
+		}
+		return fmt.Errorf("metadata is not publish-ready:\n  %s\nrun 'datapin check %s' for details",
+			strings.Join(msgs, "\n  "), ds.Slug)
 	}
 	return nil
 }
