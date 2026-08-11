@@ -541,24 +541,29 @@ func (c *Client) putPart(ctx context.Context, partURL string, r io.Reader, n int
 	if err != nil {
 		return err
 	}
-	// LIVE-VERIFIED (first sandbox multipart run, 403 on part 1): real
-	// Zenodo's part links are pre-signed object-storage URLs on another
-	// host — attaching the bearer token breaks their signature. The token
-	// travels only to the API's own host (the Waterbutler cross-host
-	// rule); local-storage instances serve same-host part URLs and still
-	// get it.
-	if c.token != "" && sameHost(partURL, c.base) {
-		req.Header.Set("Authorization", "Bearer "+c.token)
+	// LIVE-VERIFIED (sandbox multipart runs, 403 on part 1): real Zenodo's
+	// part links are pre-signed object-storage URLs on another host, and a
+	// pre-signed URL's signature covers a fixed header set — a bearer
+	// token or an unsigned Content-Type both break it. Off the API's own
+	// host, send NOTHING beyond the bytes (the Waterbutler cross-host
+	// rule); same-host part URLs (local-storage instances) keep both.
+	if sameHost(partURL, c.base) {
+		if c.token != "" {
+			req.Header.Set("Authorization", "Bearer "+c.token)
+		}
+		req.Header.Set("Content-Type", "application/octet-stream")
 	}
-	req.Header.Set("Content-Type", "application/octet-stream")
 	req.ContentLength = n
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return err
 	}
-	_ = resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("HTTP %d", resp.StatusCode)
+		// Surface the server's own explanation — object storages return
+		// XML bodies (e.g. SignatureDoesNotMatch) that name the cause.
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 	return nil
 }
