@@ -28,6 +28,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"path"
 	"strconv"
 	"strings"
 	"sync"
@@ -51,6 +52,12 @@ type dataset struct {
 	meta      map[string]any
 	draft     map[int]*file // current draft (nil when no draft)
 	published []version
+
+	// lockType is the active lock ("" = unlocked). lockPollsLeft is how
+	// many GET /locks calls remain before it auto-clears; negative means
+	// it never clears.
+	lockType      string
+	lockPollsLeft int
 }
 
 type version struct {
@@ -116,6 +123,27 @@ var licenseRegistry = []map[string]any{
 		"uri":    "http://creativecommons.org/licenses/by-sa/4.0",
 		"active": true, "isDefault": false,
 	},
+}
+
+// SetLock locks a dataset (test hook). clearAfterPolls is how many
+// GET /locks calls it survives; negative = never clears.
+func (s *Server) SetLock(pid, lockType string, clearAfterPolls int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if d := s.datasets[pid]; d != nil {
+		d.lockType = lockType
+		d.lockPollsLeft = clearAfterPolls
+	}
+}
+
+// tabularExt reports whether a filename would trigger Dataverse's
+// asynchronous tabular ingest.
+func tabularExt(name string) bool {
+	switch strings.ToLower(path.Ext(name)) {
+	case ".csv", ".tsv", ".tab", ".xlsx", ".dta", ".sav", ".por":
+		return true
+	}
+	return false
 }
 
 // contactEmail digs the first datasetContactEmail value out of a dataset
@@ -338,6 +366,8 @@ func (s *Server) datasetRoute(w http.ResponseWriter, r *http.Request, rest []str
 	switch {
 	case len(rest) == 0 && r.Method == "GET":
 		ok(w, s.datasetJSON(d))
+	case len(rest) == 1 && rest[0] == "locks" && r.Method == "GET":
+		s.locks(w, d)
 	case len(rest) == 1 && rest[0] == "add" && r.Method == "POST":
 		s.addFile(w, r, d)
 	case len(rest) == 1 && rest[0] == "versions" && r.Method == "GET":
@@ -351,7 +381,33 @@ func (s *Server) datasetRoute(w http.ResponseWriter, r *http.Request, rest []str
 	}
 }
 
+// locks lists the dataset's active locks, aging the auto-clear counter —
+// each poll of a clearing lock brings it closer to done, modeling
+// asynchronous completion deterministically.
+func (s *Server) locks(w http.ResponseWriter, d *dataset) {
+	if d.lockType == "" {
+		ok(w, []any{})
+		return
+	}
+	lock := map[string]any{"lockType": d.lockType, "message": "fake lock"}
+	if d.lockPollsLeft > 0 {
+		d.lockPollsLeft--
+		if d.lockPollsLeft == 0 {
+			d.lockType = ""
+		}
+	}
+	ok(w, []any{lock})
+}
+
+func lockedMsg(d *dataset) string {
+	return "This dataset is locked. Reason: " + d.lockType + ". Please try publishing later."
+}
+
 func (s *Server) addFile(w http.ResponseWriter, r *http.Request, d *dataset) {
+	if d.lockType != "" {
+		fail(w, 403, lockedMsg(d))
+		return
+	}
 	if d.draft == nil {
 		// Mutating a released dataset opens its draft, seeded with the
 		// latest version's files.
@@ -378,12 +434,17 @@ func (s *Server) addFile(w http.ResponseWriter, r *http.Request, d *dataset) {
 		return
 	}
 	dir := ""
+	tabIngest := true // Dataverse ingests tabular files unless told not to
 	if jd := r.FormValue("jsonData"); jd != "" {
 		var meta struct {
 			DirectoryLabel string `json:"directoryLabel"`
+			TabIngest      *bool  `json:"tabIngest"`
 		}
 		if err := json.Unmarshal([]byte(jd), &meta); err == nil {
 			dir = meta.DirectoryLabel
+			if meta.TabIngest != nil {
+				tabIngest = *meta.TabIngest
+			}
 		}
 	}
 	for _, f := range d.draft {
@@ -397,6 +458,16 @@ func (s *Server) addFile(w http.ResponseWriter, r *http.Request, d *dataset) {
 	f := &file{id: s.nextID, label: hdr.Filename, dir: dir, data: data, md5: hex.EncodeToString(sum[:])}
 	d.draft[f.id] = f
 	s.files[f.id] = f
+	// Live divergence: a tabular upload without "tabIngest": false starts
+	// asynchronous ingest, locking the dataset ("This dataset is locked.
+	// Reason: Ingest.") — and, worse than the lock, real ingest REWRITES
+	// the file (data.csv → data.tab, new checksums), breaking byte
+	// fidelity. The fake's lock never clears: the driver must disable
+	// ingest, not wait it out.
+	if tabularExt(hdr.Filename) && tabIngest {
+		d.lockType = "Ingest"
+		d.lockPollsLeft = -1
+	}
 	ok(w, map[string]any{"files": []any{map[string]any{
 		"label": f.label, "directoryLabel": f.dir,
 		"dataFile": map[string]any{"id": f.id, "filename": f.label, "md5": f.md5, "filesize": len(f.data)},
@@ -404,6 +475,10 @@ func (s *Server) addFile(w http.ResponseWriter, r *http.Request, d *dataset) {
 }
 
 func (s *Server) publish(w http.ResponseWriter, r *http.Request, d *dataset) {
+	if d.lockType != "" {
+		fail(w, 403, lockedMsg(d))
+		return
+	}
 	if r.URL.Query().Get("type") != "major" {
 		fail(w, 400, "only type=major is modeled")
 		return
