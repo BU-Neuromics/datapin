@@ -225,7 +225,7 @@ datapin/
 │   ├── sync.go              # datapin sync — push/pull; processPushEntry/processPullEntry gates
 │   ├── migrate.go           # datapin migrate — OSF exit ramp (GUID + manifest modes)
 │   ├── migrate_helpers.go   # pure migrate helpers (grouping, skeleton, TODOs, MIGRATED.md)
-│   ├── onboard.go           # datapin onboard — guided setup (auth → project → pick files)
+│   ├── onboard.go           # datapin onboard — guided setup (remote → dataset → metadata → check/publish; --osf = legacy OSF flow)
 │   ├── wiki.go              # datapin wiki command group + shared helpers (parseWikiTarget, findWikiPage, friendlyWikiError)
 │   ├── wiki_ls.go           # datapin wiki ls
 │   ├── wiki_get.go          # datapin wiki get (stdout/dest, --version)
@@ -646,20 +646,53 @@ actionable "run 'datapin auth login' or set OSF_TOKEN" message. `push`/`sync`/
 ### `datapin onboard` (`cmd/onboard.go`)
 
 Interactive, resumable guided setup (TTY-only; errors under `--output=json` or a
-non-TTY). Detects state and enters at the first unsatisfied phase: **auth**
-(offered, not required — `runLogin`, shared with `datapin auth login`) → **project**
-(attach a GUID: `--project`, a numbered pick from `client.GetUserNodes`, or typed)
-→ **select** (candidates from `internal/gitutil.Candidates`, the bubbletea tree
-picker in `internal/picker`, remote base via `--remote-base`/prompt) → writes
-manifest entries and **stops**, pointing at `datapin sync`. Pure helpers
-(`untrackedCandidates`, `remotePath`) and the tree model are unit-tested; the
-guard paths (non-TTY / `--output=json`) are integration-tested; and the full
-interactive flow is driven end-to-end over a **pseudo-terminal** in
-`integration/onboard_pty_test.go` (`creack/pty`). Because lipgloss/bubbletea
-query the terminal (OSC 11 background, CPR, DA1) and a bare PTY isn't an emulator,
-the test's reader answers those queries; it skips if a PTY can't be allocated.
-New deps: `charmbracelet/bubbletea` + `lipgloss` + `creack/pty` (pinned to keep
-the go 1.24 toolchain).
+non-TTY). Since issue #25 it onboards into the **archive publish workflow**, not
+OSF (D52). Detects state and enters at the first unsatisfied phase:
+
+1. **manifest** — `ensurePublishManifest` creates an empty `.datapin/datapin.toml`
+   when none is found (datasets need no OSF project GUID).
+2. **remote** — `ensureArchiveRemote` reuses `default_archive` / a configured
+   archive remote (`archiveRemotes` filters out workspace kinds), else runs
+   `onboardAddRemote`: a menu with the **Zenodo sandbox as option 1 and the
+   empty-answer default** (`onboardRemoteOptions`/`remoteOptionFor`), URL + name
+   + no-echo token prompt, then the shared `addArchiveRemote` (extracted from
+   `remote add`, in `cmd/remote.go`) to probe/persist. A `probeError` is the one
+   failure the wizard offers to override ("add it anyway?"). The choice is
+   recorded as `default_archive`.
+3. **dataset** — `ensureDataset`: tree picker over `onboardDatasetCandidates`
+   (drops anything already in `[[files]]`/`[[wikis]]`/a dataset), slug
+   (`defaultDatasetSlug`, deduped), file keys = full local paths (D49,
+   `datasetFilesFor`), then the DataCite floor: `collectTitle` (loops until
+   non-empty), `collectCreators` (ORCIDs normalized/checksum-validated via
+   `meta.NormalizeORCID`), `collectLicense` (**no default answer** — CC0-1.0
+   suggested, CC-BY-4.0 named, any SPDX id, or explicit "decide later"; D37),
+   `collectContactEmail` (required only for `contactEmailRequired` kinds — D38).
+4. **workspace (optional)** — `offerWorkspaceRemote` offers the second,
+   DOI-free track: kind menu (`workspaceKindFromChoice` — dir/s3/sftp, no
+   default), URL, name, S3 credentials, a `List` probe (`probeWorkspace`), then
+   `default_workspace`. Skipped when one is already configured.
+5. **summary** — runs `meta.Check` on what it wrote and points at
+   `datapin check <slug>` + `datapin publish <slug>`, plus a one-liner about
+   workspace remotes for the mutable no-DOI track.
+
+`--osf` runs the legacy OSF workspace flow unchanged (auth → project → picker →
+`[[files]]` → `datapin sync`) with a deprecation note in its help text and a
+warning when used; `--project`/`--remote-base` only apply there
+(`checkLegacyOnboardFlags` refuses them otherwise).
+
+The prompts go through the injectable `prompter{line,yes}`, so every `collect*`
+helper is unit-tested with scripted answers; the pure helpers
+(`archiveRemotes`, `remoteOptionFor`, `pickRemoteAnswer`, `licenseFromChoice`,
+`onboardDatasetCandidates`, `defaultDatasetSlug`, `datasetFilesFor`,
+`contactEmailRequired`, `untrackedCandidates`, `remotePath`) and the tree model
+are table-tested; the guard paths (non-TTY / `--output=json`) are
+integration-tested; and **both** flows are driven end-to-end over a
+**pseudo-terminal** in `integration/onboard_pty_test.go` (`creack/pty`) — the
+publish flow against `fakeinvenio`, the legacy flow against `fakeosf`. Because
+lipgloss/bubbletea query the terminal (OSC 11 background, CPR, DA1) and a bare
+PTY isn't an emulator, the test's reader answers those queries; it skips if a
+PTY can't be allocated. Deps: `charmbracelet/bubbletea` + `lipgloss` +
+`creack/pty` (pinned to keep the go 1.24 toolchain).
 
 ### Exit code handling
 
