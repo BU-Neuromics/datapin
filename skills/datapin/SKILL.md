@@ -1,14 +1,15 @@
 ---
 name: datapin
-description: "Use when working with the Open Science Framework (OSF) for research data management. Invoke when: the project contains a .datapin/datapin.toml manifest (or a legacy .gosf/gosf.toml from datapin's previous life as gosf); the user mentions OSF, osf.io, or osfclient; the task involves syncing, pushing, or pulling research data files with an OSF project; the task involves an OSF project wiki or its markdown pages; or you need to inspect, manage, or automate files stored in OSF Storage. Covers the full datapin CLI: manifest management (datapin init / add / status / sync), file transfer (datapin pull / push / rm), storage management (datapin mkdir / mv / cp), project navigation (datapin ls / info / projects / versions / open / set), project wikis (datapin wiki ls / get / push / rm / mv / versions / open / add), authentication (datapin auth), and archive remotes for FAIR data publication to Zenodo/InvenioRDM (datapin remote add / ls / rm)."
+description: "Use when working with the Open Science Framework (OSF) for research data management. Invoke when: the project contains a .datapin/datapin.toml manifest (or a legacy .gosf/gosf.toml from datapin's previous life as gosf); the user mentions OSF, osf.io, or osfclient; the task involves syncing, pushing, or pulling research data files with an OSF project; the task involves an OSF project wiki or its markdown pages; or you need to inspect, manage, or automate files stored in OSF Storage. Covers the full datapin CLI: manifest management (datapin init / add / status / sync), file transfer (datapin pull / push / rm), storage management (datapin mkdir / mv / cp), project navigation (datapin ls / info / projects / versions / open / set), project wikis (datapin wiki ls / get / push / rm / mv / versions / open / add), authentication (datapin auth), archive remotes for FAIR data publication to Zenodo/InvenioRDM (datapin remote add / ls / rm), and DOI-minting dataset publication (datapin publish)."
 metadata:
   version: "0.1.0"
 ---
 
 # datapin — Open Science Framework CLI
 
-`datapin` is a single-binary CLI that pins, syncs, and (soon) publishes
-research data. Today it syncs files with the
+`datapin` is a single-binary CLI that pins, syncs, and publishes research
+data: workspace file sync against the Open Science Framework, and
+DOI-minting dataset publication to Zenodo/InvenioRDM archives. It syncs files with the
 [Open Science Framework](https://osf.io) (OSF); it began life as `gosf`, a
 replacement for the unmaintained Python `osfclient`, and legacy `.gosf`
 manifests, `~/.config/gosf` tokens, and `GOSF_*` env vars are still read
@@ -139,6 +140,50 @@ instance (`--no-verify` skips the probe). Zenodo sandbox
 (https://sandbox.zenodo.org) and production (https://zenodo.org) are
 separate services with separate accounts and tokens — add both as remotes
 when rehearsing a publish. Sandbox DOIs (prefix `10.5072`) do not resolve.
+
+### Datasets and publishing (FAIR data publication)
+
+A `[[datasets]]` entry in the manifest groups files into one publishable
+record. `datapin publish` promotes a dataset's current files to a
+published, immutable, DOI-carrying version on its archive remote —
+**permanent and public**; rehearse on a sandbox remote first. Unchanged
+files are carried over server-side (no re-upload); only changed content
+transfers. Every publish prints the DOI and a paste-ready citation.
+
+```bash
+datapin publish [<slug>] [--dry-run] [--yes] [--force] [--reserve] [--output=json]
+datapin versions <slug>                  # archive version chain with DOIs
+datapin pull <slug> [--latest]           # fetch published bytes (pinned version; --latest re-pins)
+```
+
+- `--reserve` uploads and reserves the DOI but does NOT publish — the DOI
+  can go into a manuscript first; publish again without --reserve to go live.
+- `--force` publishes on top of a remote version the manifest has not seen
+  (otherwise refused, the dataset analogue of REMOTE_NEWER).
+- `--yes` is mandatory for JSON/non-interactive publishes.
+- Publishing needs metadata: at minimum `title` and one `creators` entry in
+  `[datasets.metadata]` (name = "Family, Given"). License and keywords are
+  strongly recommended (CC0-1.0 suggested for data).
+
+Manifest shape:
+
+```toml
+[project]
+default_archive = "sandbox"        # remote name from `datapin remote add`
+
+[[datasets]]
+slug = "counts"                    # local handle: publish/versions/pull use it
+record = ""                        # filled by the first publish
+version = 0
+  [datasets.metadata]
+  title = "Aligned RNA-seq count matrices"
+  license = "CC0-1.0"
+  [[datasets.metadata.creators]]
+  name = "Labadorf, Adam"
+  orcid = "0000-0002-…"
+  [[datasets.files]]
+  local = "results/counts.h5"      # key defaults to the basename
+```
 
 ### Manifest commands
 

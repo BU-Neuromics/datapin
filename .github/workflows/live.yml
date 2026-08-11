@@ -1,4 +1,4 @@
-name: Live OSF Tests
+name: Live Tests
 
 # Live tests hit a real private OSF project and mutate remote state, so they run
 # only on merges to the integration branch (dev) and on manual dispatch — never
@@ -40,3 +40,24 @@ jobs:
             exit 0
           fi
           go test -tags live -count=1 -v ./integration/live/...
+
+  live-zenodo:
+    name: Live Zenodo sandbox
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run live Zenodo sandbox tests
+        env:
+          ZENODO_SANDBOX_TOKEN: ${{ secrets.ZENODO_SANDBOX_TOKEN }}
+        run: |
+          if [ -z "$ZENODO_SANDBOX_TOKEN" ]; then
+            echo "::warning::ZENODO_SANDBOX_TOKEN not configured — skipping Zenodo live suite."
+            exit 0
+          fi
+          go test -tags live -count=1 -v ./integration/livezenodo/...
