@@ -1,6 +1,7 @@
 package dataverse_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/BU-Neuromics/datapin/internal/backend"
@@ -15,7 +16,8 @@ func TestContract_Dataverse(t *testing.T) {
 	contracttest.Run(t, func(t *testing.T) backend.Backend {
 		srv := fakedataverse.New(testToken)
 		t.Cleanup(srv.Close)
-		c, err := dataverse.New(srv.URL(), testToken)
+		c, err := dataverse.New(srv.URL(), testToken,
+			dataverse.WithSleep(func(context.Context) error { return nil }))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -27,7 +29,8 @@ func TestContract_Dataverse(t *testing.T) {
 func TestDataverse_PathKeys(t *testing.T) {
 	srv := fakedataverse.New(testToken)
 	t.Cleanup(srv.Close)
-	c, err := dataverse.New(srv.URL(), testToken)
+	c, err := dataverse.New(srv.URL(), testToken,
+		dataverse.WithSleep(func(context.Context) error { return nil }))
 	if err != nil {
 		t.Fatal(err)
 	}

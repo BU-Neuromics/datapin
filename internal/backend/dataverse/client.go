@@ -545,26 +545,48 @@ func (c *Client) Publish(ctx context.Context, id backend.DraftID) (backend.Publi
 	if err := c.waitUnlocked(ctx, string(id)); err != nil {
 		return backend.PublishResult{}, err
 	}
+	// Publication finalizes asynchronously (live-verified: the POST is
+	// accepted while DOI registration completes in the background), and a
+	// finalizing version is not RELEASED yet — so completion means the
+	// released-version count GREW, not merely "some version is released"
+	// (which is already true when publishing v2 over v1).
+	before, gerr := c.GetRecord(ctx, backend.RecordID(id))
+	if gerr != nil {
+		return backend.PublishResult{}, fmt.Errorf("publishing dataset %s: %w", id, gerr)
+	}
+	prior := len(before.Versions)
 	err := c.doJSON(ctx, "POST", "/api/datasets/:persistentId/actions/:publish"+pidQuery(string(id))+"&type=major", nil, nil)
 	if err != nil {
 		var verr *backend.ValidationError
 		if errors.As(err, &verr) {
 			return backend.PublishResult{}, err
 		}
+		// Non-validation failures still reconcile below (the invenio D18
+		// lesson: a publish can report failure while succeeding).
 	}
-	rec, gerr := c.GetRecord(ctx, backend.RecordID(id))
-	if gerr != nil || !rec.Published {
-		if err == nil {
-			err = gerr
+	for i := 0; ; i++ {
+		rec, gerr := c.GetRecord(ctx, backend.RecordID(id))
+		if gerr == nil && rec.Published && len(rec.Versions) > prior {
+			latest := rec.Versions[len(rec.Versions)-1]
+			return backend.PublishResult{
+				RecordID:   latest.ID,
+				DOI:        rec.DOI,
+				ConceptDOI: rec.ConceptDOI,
+			}, nil
 		}
-		return backend.PublishResult{}, fmt.Errorf("publishing dataset %s: %w", id, err)
+		if i >= c.maxLockPolls {
+			switch {
+			case gerr != nil:
+				err = gerr
+			case err == nil:
+				err = fmt.Errorf("the publish was accepted but the dataset has not finished publishing — check 'datapin versions' later")
+			}
+			return backend.PublishResult{}, fmt.Errorf("publishing dataset %s: %w", id, err)
+		}
+		if serr := c.sleep(ctx); serr != nil {
+			return backend.PublishResult{}, serr
+		}
 	}
-	latest := rec.Versions[len(rec.Versions)-1]
-	return backend.PublishResult{
-		RecordID:   latest.ID,
-		DOI:        rec.DOI,
-		ConceptDOI: rec.ConceptDOI,
-	}, nil
 }
 
 // Discard implements backend.Backend (unpublished datasets only).

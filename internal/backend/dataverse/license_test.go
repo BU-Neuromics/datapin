@@ -15,7 +15,8 @@ func newLicenseClient(t *testing.T) (*dataverse.Client, *fakedataverse.Server) {
 	t.Helper()
 	srv := fakedataverse.New(testToken)
 	t.Cleanup(srv.Close)
-	c, err := dataverse.New(srv.URL(), testToken)
+	c, err := dataverse.New(srv.URL(), testToken,
+		dataverse.WithSleep(func(context.Context) error { return nil }))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -44,6 +44,10 @@ type Server struct {
 	datasets map[string]*dataset // by persistentId
 	byID     map[int]*dataset
 	files    map[int]*file // global file id space
+
+	// publishFinalizePolls is how many dataset GETs a publish takes to
+	// finalize (asynchronous publication). Negative = never finalizes.
+	publishFinalizePolls int
 }
 
 type dataset struct {
@@ -58,6 +62,13 @@ type dataset struct {
 	// it never clears.
 	lockType      string
 	lockPollsLeft int
+
+	// finalizing models asynchronous publish (live-verified: the publish
+	// POST is accepted but the version stays unreleased until DOI
+	// finalization completes). finalizeLeft is how many dataset GETs
+	// remain before the release lands.
+	finalizing   bool
+	finalizeLeft int
 }
 
 type version struct {
@@ -78,9 +89,18 @@ func New(token string) *Server {
 	s := &Server{
 		token: token, nextID: 5000,
 		datasets: map[string]*dataset{}, byID: map[int]*dataset{}, files: map[int]*file{},
+		publishFinalizePolls: 2,
 	}
 	s.ts = httptest.NewServer(http.HandlerFunc(s.route))
 	return s
+}
+
+// SetPublishFinalizePolls tunes how many dataset GETs a publish takes to
+// finalize (test hook). Negative = the publication never finalizes.
+func (s *Server) SetPublishFinalizePolls(n int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.publishFinalizePolls = n
 }
 
 // URL returns the instance base URL.
@@ -365,6 +385,7 @@ func (s *Server) datasetRoute(w http.ResponseWriter, r *http.Request, rest []str
 	}
 	switch {
 	case len(rest) == 0 && r.Method == "GET":
+		s.maybeFinalize(d, 1) // each read brings an async publish closer to done
 		ok(w, s.datasetJSON(d))
 	case len(rest) == 1 && rest[0] == "locks" && r.Method == "GET":
 		s.locks(w, d)
@@ -487,10 +508,32 @@ func (s *Server) publish(w http.ResponseWriter, r *http.Request, d *dataset) {
 		fail(w, 400, "no draft to publish")
 		return
 	}
+	// The POST is accepted, but the release lands asynchronously (DOI
+	// finalization) — the draft stays a draft and the dataset is locked
+	// until maybeFinalize completes it.
+	d.finalizing = true
+	d.finalizeLeft = s.publishFinalizePolls
+	d.lockType = "finalizePublication"
+	d.lockPollsLeft = -1 // cleared by finalization, not by lock polls
+	s.maybeFinalize(d, 0)
+	ok(w, map[string]any{"id": d.id, "persistentId": d.pid})
+}
+
+// maybeFinalize ages an in-flight publication by cost polls and completes
+// it when the countdown reaches zero (never, when configured negative).
+func (s *Server) maybeFinalize(d *dataset, cost int) {
+	if !d.finalizing || s.publishFinalizePolls < 0 {
+		return
+	}
+	d.finalizeLeft -= cost
+	if d.finalizeLeft > 0 {
+		return
+	}
 	files := d.draft
 	d.draft = nil
 	d.published = append(d.published, version{number: len(d.published) + 1, files: files})
-	ok(w, map[string]any{"id": d.id, "persistentId": d.pid})
+	d.finalizing = false
+	d.lockType = ""
 }
 
 func (s *Server) versionsList(w http.ResponseWriter, d *dataset) {
