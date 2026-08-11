@@ -61,3 +61,28 @@ jobs:
             exit 0
           fi
           go test -tags live -count=1 -v ./integration/livezenodo/...
+
+  live-dataverse:
+    name: Live Dataverse demo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run live Dataverse demo tests
+        env:
+          DATAVERSE_DEMO_TOKEN: ${{ secrets.DATAVERSE_DEMO_TOKEN }}
+          # Optional repo variable; defaults to https://demo.dataverse.org
+          # (root collection). Point it at /dataverse/<alias> if the token's
+          # account cannot create datasets in root.
+          DATAVERSE_DEMO_URL: ${{ vars.DATAVERSE_DEMO_URL }}
+        run: |
+          if [ -z "$DATAVERSE_DEMO_TOKEN" ]; then
+            echo "::warning::DATAVERSE_DEMO_TOKEN not configured — skipping Dataverse live suite."
+            exit 0
+          fi
+          go test -tags live -count=1 -v ./integration/livedataverse/...
