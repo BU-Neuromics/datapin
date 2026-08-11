@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/BU-Neuromics/datapin/internal/backend"
 	"github.com/BU-Neuromics/datapin/internal/backend/dataverse"
 	"github.com/BU-Neuromics/datapin/internal/testutil/fakedataverse"
 )
@@ -67,5 +68,50 @@ func TestPublish_FinalizationNeverCompletes(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), "%!w") {
 		t.Fatalf("err %v wraps a nil error", err)
+	}
+}
+
+// Re-uploading an existing key must replace it in place — never trigger
+// Dataverse's silent duplicate rename (data.csv → data-1.csv), and never
+// leave two entries. Exercises the implicit-draft fallback (the draft is
+// not readable until a mutation opens it) plus the pre-delete.
+func TestUploadFile_ReplacesSameKeyInImplicitDraft(t *testing.T) {
+	srv := fakedataverse.New(testToken)
+	t.Cleanup(srv.Close)
+	c, err := dataverse.New(srv.URL(), testToken,
+		dataverse.WithSleep(func(context.Context) error { return nil }))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	id, err := c.CreateDraft(ctx, licenseMeta("CC0-1.0"))
+	if err != nil {
+		t.Fatalf("CreateDraft: %v", err)
+	}
+	v1 := []byte("x,y\n1,2\n")
+	if _, err := c.UploadFile(ctx, id, "tables/data.csv", bytes.NewReader(v1), int64(len(v1)), sumOf(v1)); err != nil {
+		t.Fatalf("upload v1: %v", err)
+	}
+	if _, err := c.Publish(ctx, id); err != nil {
+		t.Fatalf("publish v1: %v", err)
+	}
+	draft, err := c.NewVersion(ctx, backend.RecordID(id))
+	if err != nil {
+		t.Fatalf("NewVersion: %v", err)
+	}
+	v2 := []byte("x,y\n1,3\n")
+	fi, err := c.UploadFile(ctx, draft, "tables/data.csv", bytes.NewReader(v2), int64(len(v2)), sumOf(v2))
+	if err != nil {
+		t.Fatalf("upload v2 over v1's key: %v", err)
+	}
+	if fi.Key != "tables/data.csv" || fi.Checksum != sumOf(v2) {
+		t.Fatalf("v2 upload = %+v, want the same key with v2's checksum", fi)
+	}
+	files, err := c.ListDraftFiles(ctx, draft)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 1 || files[0].Key != "tables/data.csv" || files[0].Checksum != sumOf(v2) {
+		t.Fatalf("draft files = %+v, want exactly one replaced entry", files)
 	}
 }

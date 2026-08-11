@@ -468,15 +468,26 @@ func (s *Server) addFile(w http.ResponseWriter, r *http.Request, d *dataset) {
 			}
 		}
 	}
-	for _, f := range d.draft {
-		if f.label == hdr.Filename && f.dir == dir {
-			fail(w, 400, "a file with this name already exists at this path")
-			return
+	// LIVE-VERIFIED: Dataverse does NOT reject a duplicate label+dir — it
+	// silently renames the incoming file (data.csv → data-1.csv), which is
+	// how a replace-gone-wrong published v1's data.csv alongside a renamed
+	// v2 upload. Model the rename so drivers must handle it.
+	name := hdr.Filename
+	for taken, n := true, 0; taken; {
+		taken = false
+		for _, f := range d.draft {
+			if f.label == name && f.dir == dir {
+				n++
+				ext := path.Ext(hdr.Filename)
+				name = strings.TrimSuffix(hdr.Filename, ext) + fmt.Sprintf("-%d", n) + ext
+				taken = true
+				break
+			}
 		}
 	}
 	sum := md5.Sum(data)
 	s.nextID++
-	f := &file{id: s.nextID, label: hdr.Filename, dir: dir, data: data, md5: hex.EncodeToString(sum[:])}
+	f := &file{id: s.nextID, label: name, dir: dir, data: data, md5: hex.EncodeToString(sum[:])}
 	d.draft[f.id] = f
 	s.files[f.id] = f
 	// Live divergence: a tabular upload without "tabIngest": false starts
@@ -557,16 +568,14 @@ func (s *Server) versionFiles(w http.ResponseWriter, d *dataset, ver string) {
 	switch ver {
 	case ":draft":
 		if d.draft == nil {
-			// A released dataset with no open draft: the draft view is the
-			// latest released version (matches Dataverse's lazy drafts).
-			if len(d.published) == 0 {
-				fail(w, 404, "no draft")
-				return
-			}
-			files = d.published[len(d.published)-1].files
-		} else {
-			files = d.draft
+			// LIVE-VERIFIED: there is no readable :draft version until a
+			// mutation lazily opens one — a released dataset with no open
+			// draft 404s here (the lazy seeding happens on the first /add
+			// or file DELETE, not on reads).
+			fail(w, 404, "no draft")
+			return
 		}
+		files = d.draft
 	case ":latest-published":
 		if len(d.published) == 0 {
 			fail(w, 404, "not published")

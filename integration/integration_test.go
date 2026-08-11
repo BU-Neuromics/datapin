@@ -86,7 +86,7 @@ func (e *testEnv) run(args ...string) (stdout, stderr string, code int) {
 	e.t.Helper()
 	cmd := exec.Command(binaryPath, args...)
 	cmd.Dir = e.dir
-	cmd.Env = append(os.Environ(),
+	cmd.Env = append(hermeticEnv(),
 		// The OSF client appends "/nodes/...", "/files/..." etc. to the base,
 		// so we must include the /v2 prefix that the real URL carries.
 		"DATAPIN_API_BASE="+e.srv.URL()+"/v2",
@@ -118,7 +118,7 @@ func (e *testEnv) runClean(stdin string, args ...string) (stdout, stderr string,
 	e.t.Helper()
 	cmd := exec.Command(binaryPath, args...)
 	cmd.Dir = e.dir
-	cmd.Env = append(os.Environ(),
+	cmd.Env = append(hermeticEnv(),
 		"DATAPIN_API_BASE="+e.srv.URL()+"/v2",
 		"DATAPIN_FILES_BASE="+e.srv.URL(),
 		"HOME="+e.dir,
@@ -1507,7 +1507,7 @@ func TestProjects_NoToken(t *testing.T) {
 	// Override to remove the token.
 	cmd := exec.Command(binaryPath, "projects")
 	cmd.Dir = env.dir
-	cmd.Env = append(os.Environ(),
+	cmd.Env = append(hermeticEnv(),
 		"DATAPIN_API_BASE="+env.srv.URL()+"/v2",
 		"DATAPIN_FILES_BASE="+env.srv.URL(),
 		"OSF_TOKEN=",
@@ -3064,4 +3064,13 @@ func TestStatus_LargeManifestScanIsPageEfficient(t *testing.T) {
 	if spent := env.srv.ListRequests() - before; spent > 2 {
 		t.Errorf("scanning %d files took %d listing requests, want 2", n, spent)
 	}
+}
+
+// hermeticEnv is os.Environ() with the host's D-Bus session severed: the
+// binary's keychain lookups must fail fast and fall through to the file
+// store, never block on a real Secret Service unlock prompt (a locked
+// desktop keyring hung the whole suite — the CLI's token ladder reads
+// env > keychain > token file, and a prompt parks it at step two).
+func hermeticEnv() []string {
+	return append(os.Environ(), "DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent/datapin-hermetic")
 }
