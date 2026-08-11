@@ -57,8 +57,12 @@ type Metadata struct {
 	License         string // SPDX id, e.g. "CC0-1.0"
 	Keywords        []string
 	ResourceType    string // backend vocabulary id, e.g. "dataset"
-	Creators        []Creator
-	Version         string // optional human-readable version label
+	// ContactEmail is the dataset's point-of-contact e-mail. Dataverse
+	// requires it (datasetContactEmail, live-verified); other backends
+	// ignore it.
+	ContactEmail string
+	Creators     []Creator
+	Version      string // optional human-readable version label
 }
 
 // FileInfo describes one file on a draft or published record.

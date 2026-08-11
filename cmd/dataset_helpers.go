@@ -126,6 +126,7 @@ func datasetBackendMetadata(ds *manifest.Dataset) backend.Metadata {
 		License:         md.License,
 		Keywords:        md.Keywords,
 		ResourceType:    md.ResourceType,
+		ContactEmail:    md.ContactEmail,
 	}
 	if out.Publisher == "" {
 		out.Publisher = "Zenodo"

@@ -85,6 +85,7 @@ slug = "dvset"
   [datasets.metadata]
   title = "dataverse integration dataset"
   license = "CC0-1.0"
+  contact_email = "ci@example.edu"
   [[datasets.metadata.creators]]
   name = "Tester, Trusty"
 

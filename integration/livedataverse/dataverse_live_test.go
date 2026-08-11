@@ -142,6 +142,7 @@ slug = "live"
   title = "%s live-tier lifecycle test"
   description = "Created by datapin's live test suite; safe to delete."
   license = "CC0-1.0"
+  contact_email = "datapin-ci@example.edu"
   keywords = ["datapin-ci"]
   [[datasets.metadata.creators]]
   name = "CI, Datapin"
