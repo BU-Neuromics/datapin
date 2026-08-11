@@ -1,0 +1,20 @@
+HTTP/1.1 204 NO CONTENT
+server: nginx
+date: Mon, 10 Aug 2026 23:38:44 GMT
+content-type: text/html; charset=utf-8
+x-ratelimit-limit: 1000
+x-ratelimit-remaining: 998
+x-ratelimit-reset: 1786405139
+retry-after: 14
+permissions-policy: interest-cohort=()
+x-frame-options: sameorigin
+x-xss-protection: 1; mode=block
+x-content-type-options: nosniff
+content-security-policy: default-src 'self' fonts.googleapis.com *.gstatic.com data: 'unsafe-inline' 'unsafe-eval' blob: zenodo-broker.web.cern.ch zenodo-broker-qa.web.cern.ch maxcdn.bootstrapcdn.com cdnjs.cloudflare.com ajax.googleapis.com webanalytics.web.cern.ch
+strict-transport-security: max-age=31556926; includeSubDomains
+referrer-policy: strict-origin-when-cross-origin
+set-cookie: csrftoken=REDACTED; Expires=Mon, 17 Aug 2026 23:38:44 GMT; Max-Age=604800; Secure; Path=/; SameSite=Lax
+access-control-allow-origin: *
+access-control-expose-headers: Content-Type, ETag, Link, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset
+x-source: ui
+
