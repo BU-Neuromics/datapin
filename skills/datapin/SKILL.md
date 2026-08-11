@@ -1,6 +1,6 @@
 ---
 name: datapin
-description: "Use when working with the Open Science Framework (OSF) for research data management. Invoke when: the project contains a .datapin/datapin.toml manifest (or a legacy .gosf/gosf.toml from datapin's previous life as gosf); the user mentions OSF, osf.io, or osfclient; the task involves syncing, pushing, or pulling research data files with an OSF project; the task involves an OSF project wiki or its markdown pages; or you need to inspect, manage, or automate files stored in OSF Storage. Covers the full datapin CLI: manifest management (datapin init / add / status / sync), file transfer (datapin pull / push / rm), storage management (datapin mkdir / mv / cp), project navigation (datapin ls / info / projects / versions / open / set), project wikis (datapin wiki ls / get / push / rm / mv / versions / open / add), authentication (datapin auth), archive remotes for FAIR data publication to Zenodo/InvenioRDM (datapin remote add / ls / rm), DOI-minting dataset publication (datapin publish), metadata linting and FAIR assessment (datapin check), standard metadata export (datapin export), and citations (datapin cite)."
+description: "Use when working with the Open Science Framework (OSF) for research data management. Invoke when: the project contains a .datapin/datapin.toml manifest (or a legacy .gosf/gosf.toml from datapin's previous life as gosf); the user mentions OSF, osf.io, or osfclient; the task involves syncing, pushing, or pulling research data files with an OSF project; the task involves an OSF project wiki or its markdown pages; or you need to inspect, manage, or automate files stored in OSF Storage. Covers the full datapin CLI: manifest management (datapin init / add / status / sync), file transfer (datapin pull / push / rm), storage management (datapin mkdir / mv / cp), project navigation (datapin ls / info / projects / versions / open / set), project wikis (datapin wiki ls / get / push / rm / mv / versions / open / add), authentication (datapin auth), archive remotes for FAIR data publication to Zenodo/InvenioRDM (datapin remote add / ls / rm), DOI-minting dataset publication (datapin publish), metadata linting and FAIR assessment (datapin check), standard metadata export (datapin export), citations (datapin cite), and static documentation sites with dataset landing pages (datapin site build / preview / publish)."
 metadata:
   version: "0.1.0"
 ---
@@ -177,6 +177,35 @@ datapin cite <slug> [--bibtex]           # paste-ready citation via DOI content 
 nudges (missing description/keywords/ORCIDs, NC/ND licenses). `check
 --fair` runs an F-UJI assessment of the published DOI (needs a resolving,
 non-sandbox DOI; configure `DATAPIN_FUJI_URL`/`_USER`/`_PASS`).
+
+### Documentation site
+
+`datapin site` renders a static site from the manifest — markdown pages
+under `[[site.pages]]` plus a generated, citation-ready landing page per
+dataset (DOI links, file checksums, schema.org JSON-LD for Google Dataset
+Search) — and deploys it as a single orphan commit force-pushed to the
+`gh-pages` branch (no workflow file, no site history).
+
+```bash
+datapin site build [--out <dir>]                 # render into <repo>/public (or --out)
+datapin site preview [--addr localhost:8383] [--out <dir>]    # build + serve locally
+datapin site publish [--github-token <tok>] [--out <dir>]     # build + push to gh-pages, enable Pages
+```
+
+Site config in the manifest:
+
+```toml
+[site]
+title    = "Cortical RNA-seq"
+base_url = "https://org.github.io/repo"   # for sitemap + absolute JSON-LD URLs
+repo     = "org/repo"                     # gh-pages target; default: git origin
+[[site.pages]]
+local = "docs/index.md"                   # slug defaults to the basename
+```
+
+`site publish` finds a GitHub token via --github-token → `GITHUB_TOKEN` →
+`GH_TOKEN` → `gh auth token`; without one the push uses your git
+credential helper and the first-run Pages toggle is skipped with a note.
 
 Manifest shape:
 

@@ -1,0 +1,13 @@
+{{.Body}}
+{{if .Cards}}
+<section class="datasets">
+<h2>Datasets</h2>
+<div class="cards">
+{{range .Cards}}  <a class="card" href="datasets/{{.Slug}}/">
+    <h3>{{.Title}}</h3>
+    {{if .Descr}}<p>{{.Descr}}</p>{{end}}
+    {{if .Published}}<p class="doi">DOI: {{.DOI}}</p>{{else}}<p class="unpublished">unpublished</p>{{end}}
+  </a>
+{{end}}</div>
+</section>
+{{end}}
