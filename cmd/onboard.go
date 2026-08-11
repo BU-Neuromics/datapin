@@ -415,7 +415,7 @@ func onboardAddRemote(ctx context.Context, p prompter) (config.Remote, error) {
 	token := promptSecret(fmt.Sprintf("API token for %s (Enter to skip; set DATAPIN_TOKEN_%s before publishing)", url, envSuffix(name)))
 
 	r := config.Remote{Name: name, Kind: opt.Kind, URL: url}
-	sandbox, tokenStored, err := addArchiveRemote(ctx, r, token, true, noKeychain)
+	added, err := addArchiveRemote(ctx, r, token, true, noKeychain)
 	if err != nil {
 		var pe probeError
 		if !errors.As(err, &pe) {
@@ -425,15 +425,21 @@ func onboardAddRemote(ctx context.Context, p prompter) (config.Remote, error) {
 		if !p.yes("Add it anyway (unverified)?") {
 			return config.Remote{}, fmt.Errorf("remote %q not added: %w", name, err)
 		}
-		if sandbox, tokenStored, err = addArchiveRemote(ctx, r, token, false, noKeychain); err != nil {
+		// Unverified: no capabilities were learned, so the remote keeps the
+		// driver defaults (issue #20, D55).
+		if added, err = addArchiveRemote(ctx, r, token, false, noKeychain); err != nil {
 			return config.Remote{}, err
 		}
 	}
 	fmt.Fprintf(os.Stderr, "%s added remote %q (%s)\n", output.Green("✓"), name, url)
-	if sandbox {
+	if added.Sandbox {
 		fmt.Fprintln(os.Stderr, output.Dim("  sandbox instance — DOIs it mints (prefix 10.5072) do not resolve"))
 	}
-	if !tokenStored {
+	if added.Caps != nil && len(added.Caps.ResourceTypes) > 0 {
+		fmt.Fprintln(os.Stderr, output.Dim(fmt.Sprintf(
+			"  probed %d resource types from the instance vocabulary", len(added.Caps.ResourceTypes))))
+	}
+	if !added.TokenStored {
 		fmt.Fprintf(os.Stderr, "%s\n", output.Yellow(fmt.Sprintf("  no token stored — set DATAPIN_TOKEN_%s or run: datapin remote add %s --name %s --token-value <token>", envSuffix(name), url, name)))
 	}
 	return r, nil

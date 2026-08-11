@@ -19,6 +19,10 @@ type Remote struct {
 	Name string `toml:"-"`
 	Kind string `toml:"kind"` // "invenio" (Figshare, Dataverse later)
 	URL  string `toml:"url"`
+	// Caps are the per-instance capabilities probed at `remote add` time
+	// (issue #20, D54), nil when the remote was never probed (--no-verify)
+	// or the probe learned nothing. Hand-editable overrides live here too.
+	Caps *RemoteCaps `toml:"caps,omitempty"`
 }
 
 // remotesFile mirrors the [remotes.<name>] tables in config.toml.
@@ -138,7 +142,11 @@ func AddRemote(r Remote) error {
 	if _, dup := remotes[r.Name]; dup {
 		return fmt.Errorf("remote %q already exists — remove it first with: datapin remote rm %s", r.Name, r.Name)
 	}
-	remotes[r.Name] = map[string]any{"kind": r.Kind, "url": r.URL}
+	entry := map[string]any{"kind": r.Kind, "url": r.URL}
+	if !r.Caps.IsEmpty() {
+		entry["caps"] = capsTable(r.Caps)
+	}
+	remotes[r.Name] = entry
 	raw["remotes"] = remotes
 	return writeConfigRaw(raw, path)
 }

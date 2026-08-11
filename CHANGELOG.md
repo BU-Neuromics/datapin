@@ -13,6 +13,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Per-instance capabilities for InvenioRDM remotes** (#20, D54–D56): `remote
+  add` now probes what an instance declares about itself instead of assuming
+  the Zenodo profile, and stores it under `[remotes.<name>.caps]` in
+  config.toml so no later command re-probes. Probed: the resource-type
+  vocabulary (`datapin check` errors on a `resource_type` the instance does not
+  offer) and whether the instance can do multipart uploads at all (inferred
+  from the file schema it serves — pre-InvenioRDM-v13 instances have none).
+  Not exposed by the API and therefore documented defaults: per-record file
+  count and size — add them to the caps table by hand for an institutional
+  instance. New `datapin remote probe <name>` re-probes in place (a failed
+  probe leaves stored values untouched); `--no-verify` skips probing entirely.
+  A large upload no longer fails when an instance rejects the multipart
+  transfer type — it falls back to a single PUT.
+
 ### Changed
 
 - **`datapin onboard` now onboards into the publish workflow** (#25, D53):

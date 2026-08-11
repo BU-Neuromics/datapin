@@ -19,6 +19,14 @@ func (e *invenioEnv) setupDataset(t *testing.T) {
 		"--name", "sandbox", "--token-value", invenioTestToken, "--no-keychain"); code != 0 {
 		t.Fatalf("remote add: %s", stderr)
 	}
+	e.setupDatasetNoRemote(t, "")
+}
+
+// setupDatasetNoRemote writes the dataset fixture without touching the
+// remote config (the remote may be added separately, or deliberately probed
+// differently). extraMetadata is appended inside [datasets.metadata].
+func (e *invenioEnv) setupDatasetNoRemote(t *testing.T, extraMetadata string) {
+	t.Helper()
 	mustWrite := func(rel, content string) {
 		t.Helper()
 		p := filepath.Join(e.dir, rel)
@@ -43,6 +51,7 @@ slug = "counts"
   [datasets.metadata]
   title = "integration test dataset"
   license = "CC0-1.0"
+  `+extraMetadata+`
   [[datasets.metadata.creators]]
   name = "Tester, Trusty"
 
