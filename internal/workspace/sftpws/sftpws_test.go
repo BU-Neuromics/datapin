@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"io"
 	"net"
+	"path/filepath"
 	"testing"
 
 	"github.com/pkg/sftp"
@@ -18,6 +19,12 @@ import (
 // newStore runs a real sftp server in-process over a pipe — the whole
 // protocol without ssh — rooted at a temp dir.
 func newStore(t *testing.T) *sftpws.Store {
+	t.Helper()
+	return newStoreAt(t, t.TempDir())
+}
+
+// newStoreAt is newStore rooted at an arbitrary base path.
+func newStoreAt(t *testing.T, base string) *sftpws.Store {
 	t.Helper()
 	serverConn, clientConn := net.Pipe()
 	server, err := sftp.NewServer(serverConn)
@@ -32,7 +39,7 @@ func newStore(t *testing.T) *sftpws.Store {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = client.Close() })
-	return sftpws.NewFromClient(client, t.TempDir())
+	return sftpws.NewFromClient(client, base)
 }
 
 func md5hex(b []byte) string {
@@ -128,3 +135,17 @@ func TestStoreBasics(t *testing.T) {
 }
 
 var _ io.Writer = (*bytes.Buffer)(nil)
+
+// A base path that does not exist yet is a valid, empty workspace — the
+// dir driver creates its root and S3 prefixes are virtual, so SFTP must
+// not fail `remote add`'s probe on a fresh directory (Push MkdirAlls it).
+func TestList_MissingBaseIsEmptyWorkspace(t *testing.T) {
+	s := newStoreAt(t, filepath.Join(t.TempDir(), "not-created-yet"))
+	objs, err := s.List(context.Background())
+	if err != nil {
+		t.Fatalf("List on a missing base: %v", err)
+	}
+	if len(objs) != 0 {
+		t.Fatalf("objs = %v, want empty", objs)
+	}
+}
