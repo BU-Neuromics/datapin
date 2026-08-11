@@ -78,6 +78,20 @@ func zenodoCaps(host string) backend.Caps {
 // Capabilities implements backend.Backend.
 func (c *Client) Capabilities() backend.Caps { return c.caps }
 
+// Ping verifies the base URL answers like an InvenioRDM instance by
+// fetching the (anonymous, instance-defined) resource-type vocabulary.
+func (c *Client) Ping(ctx context.Context) error {
+	var out struct {
+		Hits struct {
+			Total int `json:"total"`
+		} `json:"hits"`
+	}
+	if err := c.doJSON(ctx, "GET", "/api/vocabularies/resourcetypes?size=1", nil, &out); err != nil {
+		return fmt.Errorf("%s does not answer like an InvenioRDM instance: %w", c.base, err)
+	}
+	return nil
+}
+
 // --- wire types (hybrid legacy/RDM, read defensively per D19) ---
 
 type recordJSON struct {

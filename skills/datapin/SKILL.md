@@ -1,6 +1,6 @@
 ---
 name: datapin
-description: "Use when working with the Open Science Framework (OSF) for research data management. Invoke when: the project contains a .datapin/datapin.toml manifest (or a legacy .gosf/gosf.toml from datapin's previous life as gosf); the user mentions OSF, osf.io, or osfclient; the task involves syncing, pushing, or pulling research data files with an OSF project; the task involves an OSF project wiki or its markdown pages; or you need to inspect, manage, or automate files stored in OSF Storage. Covers the full datapin CLI: manifest management (datapin init / add / status / sync), file transfer (datapin pull / push / rm), storage management (datapin mkdir / mv / cp), project navigation (datapin ls / info / projects / versions / open / set), project wikis (datapin wiki ls / get / push / rm / mv / versions / open / add), and authentication (datapin auth)."
+description: "Use when working with the Open Science Framework (OSF) for research data management. Invoke when: the project contains a .datapin/datapin.toml manifest (or a legacy .gosf/gosf.toml from datapin's previous life as gosf); the user mentions OSF, osf.io, or osfclient; the task involves syncing, pushing, or pulling research data files with an OSF project; the task involves an OSF project wiki or its markdown pages; or you need to inspect, manage, or automate files stored in OSF Storage. Covers the full datapin CLI: manifest management (datapin init / add / status / sync), file transfer (datapin pull / push / rm), storage management (datapin mkdir / mv / cp), project navigation (datapin ls / info / projects / versions / open / set), project wikis (datapin wiki ls / get / push / rm / mv / versions / open / add), authentication (datapin auth), and archive remotes for FAIR data publication to Zenodo/InvenioRDM (datapin remote add / ls / rm)."
 metadata:
   version: "0.1.0"
 ---
@@ -119,6 +119,26 @@ otherwise — safe to use in CI. It content-compares unpinned (`version=0`) entr
 against the remote instead of blindly reporting "never pushed".
 
 ## Command reference
+
+### Archive remotes (Zenodo / InvenioRDM)
+
+Named archive remotes are where datasets publish (DOI-minting backends —
+distinct from the OSF workspace project). Stored in
+`~/.config/datapin/config.toml`; tokens live in the OS keychain or
+`~/.config/datapin/tokens/<name>`, resolved as `DATAPIN_TOKEN_<NAME>` env
+var → keychain → token file.
+
+```bash
+datapin remote add <url> --name <name> [--kind invenio] [--token-value <tok>] [--no-verify] [--no-keychain]
+datapin remote ls [--output=json]        # list remotes and whether each has a token
+datapin remote rm <name>                 # remove a remote and its stored token
+```
+
+`remote add` probes the URL to confirm it answers like an InvenioRDM
+instance (`--no-verify` skips the probe). Zenodo sandbox
+(https://sandbox.zenodo.org) and production (https://zenodo.org) are
+separate services with separate accounts and tokens — add both as remotes
+when rehearsing a publish. Sandbox DOIs (prefix `10.5072`) do not resolve.
 
 ### Manifest commands
 

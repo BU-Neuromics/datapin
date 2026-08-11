@@ -334,3 +334,14 @@ func TestCapabilities_ZenodoProfile(t *testing.T) {
 		t.Errorf("caps = %+v, want 100-file cap and md5", caps)
 	}
 }
+
+func TestPing(t *testing.T) {
+	c, srv := newClient(t)
+	if err := c.Ping(context.Background()); err != nil {
+		t.Fatalf("Ping against a live instance: %v", err)
+	}
+	srv.Close()
+	if err := c.Ping(context.Background()); err == nil {
+		t.Fatal("Ping against a dead instance must fail")
+	}
+}
