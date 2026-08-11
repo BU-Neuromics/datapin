@@ -38,12 +38,27 @@ type Client struct {
 	http       *httpx.RetryClient
 	caps       backend.Caps
 	licCache   []licenseEntry // /api/licenses, fetched once per client
+
+	// Lock polling (waitUnlocked): sleep is context-aware and injectable
+	// for tests; maxLockPolls bounds the wait.
+	sleep         func(ctx context.Context) error
+	lockPollDelay time.Duration
+	maxLockPolls  int
+}
+
+// Option customizes a Client.
+type Option func(*Client)
+
+// WithSleep replaces the inter-poll sleep used while waiting on dataset
+// locks (tests pass a no-op).
+func WithSleep(sleep func(ctx context.Context) error) Option {
+	return func(c *Client) { c.sleep = sleep }
 }
 
 // New returns a Client for the instance at baseURL. A collection alias
 // may ride on the URL path (https://host/dataverse/<alias>); datasets are
 // created under it, defaulting to "root" (D29).
-func New(baseURL, token string) (*Client, error) {
+func New(baseURL, token string, opts ...Option) (*Client, error) {
 	u, err := url.Parse(baseURL)
 	if err != nil || u.Scheme == "" || u.Host == "" {
 		return nil, fmt.Errorf("invalid backend URL %q", baseURL)
@@ -54,11 +69,13 @@ func New(baseURL, token string) (*Client, error) {
 		collection = strings.Trim(rest, "/")
 		base = u.Scheme + "://" + u.Host
 	}
-	return &Client{
-		base:       base,
-		collection: collection,
-		token:      token,
-		http:       httpx.New(&http.Client{Timeout: 60 * time.Second}),
+	c := &Client{
+		base:          base,
+		collection:    collection,
+		token:         token,
+		http:          httpx.New(&http.Client{Timeout: 60 * time.Second}),
+		lockPollDelay: 5 * time.Second,
+		maxLockPolls:  24, // ~2 minutes at the default delay
 		caps: backend.Caps{
 			MintsDOI:      true,
 			PerVersionDOI: false,
@@ -70,7 +87,44 @@ func New(baseURL, token string) (*Client, error) {
 			ChecksumAlgo:    "md5",
 			Sandbox:         strings.Contains(u.Host, "demo."),
 		},
-	}, nil
+	}
+	c.sleep = func(ctx context.Context) error {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(c.lockPollDelay):
+			return nil
+		}
+	}
+	for _, o := range opts {
+		o(c)
+	}
+	return c, nil
+}
+
+// waitUnlocked polls the dataset's locks until they clear (bounded).
+// Dataverse locks datasets during asynchronous work — tabular ingest,
+// post-publish DOI finalization — and rejects mutations and publishes
+// with a 403 while locked (live-verified: "This dataset is locked.
+// Reason: Ingest. Please try publishing later.").
+func (c *Client) waitUnlocked(ctx context.Context, pid string) error {
+	for i := 0; ; i++ {
+		var locks []struct {
+			LockType string `json:"lockType"`
+		}
+		if err := c.doJSON(ctx, "GET", "/api/datasets/:persistentId/locks"+pidQuery(pid), nil, &locks); err != nil {
+			return fmt.Errorf("checking locks on %s: %w", pid, err)
+		}
+		if len(locks) == 0 {
+			return nil
+		}
+		if i >= c.maxLockPolls {
+			return fmt.Errorf("dataset %s is still locked (%s) after waiting — try again later", pid, locks[0].LockType)
+		}
+		if err := c.sleep(ctx); err != nil {
+			return err
+		}
+	}
 }
 
 // Capabilities implements backend.Backend.
@@ -388,6 +442,11 @@ func (c *Client) UpdateMetadata(ctx context.Context, id backend.DraftID, meta ba
 // UploadFile implements backend.Backend via the multipart add endpoint,
 // verifying the server's computed MD5 against the expected sum.
 func (c *Client) UploadFile(ctx context.Context, id backend.DraftID, key string, r io.Reader, size int64, sum backend.Checksum) (backend.FileInfo, error) {
+	// A previous publish may still be finalizing (async DOI registration
+	// locks the dataset); mutations 403 while locked.
+	if err := c.waitUnlocked(ctx, string(id)); err != nil {
+		return backend.FileInfo{}, err
+	}
 	dir, name := splitKey(key)
 
 	var buf bytes.Buffer
@@ -399,7 +458,11 @@ func (c *Client) UploadFile(ctx context.Context, id backend.DraftID, key string,
 	if _, err := io.Copy(part, r); err != nil {
 		return backend.FileInfo{}, err
 	}
-	jsonData, _ := json.Marshal(map[string]any{"directoryLabel": dir})
+	// tabIngest=false: Dataverse would otherwise ingest tabular files
+	// asynchronously — locking the dataset AND rewriting the file
+	// (data.csv → data.tab, new checksums). datapin's contract is byte
+	// fidelity: the bytes pinned are the bytes served back (D39).
+	jsonData, _ := json.Marshal(map[string]any{"directoryLabel": dir, "tabIngest": false})
 	if err := mw.WriteField("jsonData", string(jsonData)); err != nil {
 		return backend.FileInfo{}, err
 	}
@@ -479,6 +542,9 @@ func (c *Client) ReserveDOI(ctx context.Context, id backend.DraftID) (string, er
 // Publish implements backend.Backend (major release). Reconciles by
 // re-reading the dataset when the action's outcome is inconclusive.
 func (c *Client) Publish(ctx context.Context, id backend.DraftID) (backend.PublishResult, error) {
+	if err := c.waitUnlocked(ctx, string(id)); err != nil {
+		return backend.PublishResult{}, err
+	}
 	err := c.doJSON(ctx, "POST", "/api/datasets/:persistentId/actions/:publish"+pidQuery(string(id))+"&type=major", nil, nil)
 	if err != nil {
 		var verr *backend.ValidationError
