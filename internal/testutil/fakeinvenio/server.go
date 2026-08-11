@@ -510,8 +510,9 @@ func (s *Server) download(w http.ResponseWriter, rec *record, key string) {
 		jsonError(w, 404, "Not found.")
 		return
 	}
-	// Downloads carry oc-checksum, not Content-MD5 (zenodo-notes).
-	w.Header().Set("oc-checksum", "MD5:"+f.md5hex)
+	// Downloads carry oc-checksum, not Content-MD5, and real Zenodo
+	// strips leading zeros from the hex (live-tier finding) — mirror it.
+	w.Header().Set("oc-checksum", "MD5:"+strings.TrimLeft(f.md5hex, "0"))
 	w.Header().Set("Content-Length", strconv.Itoa(len(f.data)))
 	w.WriteHeader(200)
 	_, _ = w.Write(f.data)

@@ -345,3 +345,25 @@ func TestPing(t *testing.T) {
 		t.Fatal("Ping against a dead instance must fail")
 	}
 }
+
+// Real Zenodo's oc-checksum header strips leading zeros from the MD5 hex
+// (caught by the live tier: stream 0da8f… vs header da8f…). The driver
+// must normalize before comparing; the fake mirrors the stripping.
+func TestDownloadFile_LeadingZeroChecksum(t *testing.T) {
+	c, _ := newClient(t)
+	ctx := context.Background()
+	id, _ := c.CreateDraft(ctx, meta())
+	content := []byte("leading-zero-probe-34") // md5 0ccc4758a10812e97ab41a399570de24
+	mustUpload(t, c, id, "zero.bin", content)
+	res, err := c.Publish(ctx, id)
+	if err != nil {
+		t.Fatalf("Publish: %v", err)
+	}
+	var buf bytes.Buffer
+	if err := c.DownloadFile(ctx, res.RecordID, "zero.bin", &buf); err != nil {
+		t.Fatalf("DownloadFile with leading-zero MD5: %v", err)
+	}
+	if !bytes.Equal(buf.Bytes(), content) {
+		t.Errorf("downloaded %q", buf.Bytes())
+	}
+}
