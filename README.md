@@ -82,14 +82,22 @@ counts` restores the pinned bytes anywhere the repo is cloned.
 datapin is the reboot of [`gosf`](https://github.com/BU-Neuromics/gosf) as a
 multi-backend FAIR data publication tool. What ships today:
 
-- **Workspace remotes** (OSF; S3-compatible and SFTP planned) keep the
-  mutable push/pull/sync workflow for intermediate results — no DOIs, no
-  metadata ceremony.
-- **Archive backends** (Zenodo and any InvenioRDM instance; Figshare and
-  Dataverse planned): `datapin publish` promotes a dataset to an immutable,
-  versioned, DOI-carrying record. `datapin check` lints metadata against the
-  DataCite floor (SPDX licenses, ORCID checksums, relation types) and
-  `check --fair` runs an F-UJI FAIR assessment. `datapin export` writes
+- **Workspace remotes** — OSF, plus journal-versioned dataset sync to a
+  **directory** (mounted NAS), **S3-compatible storage** (MinIO, R2,
+  institutional object stores), or **SFTP** (any cluster): `datapin push
+  <slug>` keeps intermediate results portable with no DOIs and no metadata
+  ceremony. Superseded versions archive server-side, an append-only journal
+  narrates every push and revert (`datapin versions <slug>/<key>`,
+  `datapin revert --to N`), and every version datapin wrote is revertible
+  until `datapin gc` reclaims it.
+- **Archive backends** — **Zenodo and any InvenioRDM instance**,
+  **Figshare**, and **Dataverse**: `datapin publish` promotes a dataset to an immutable,
+  versioned, DOI-carrying record — one adapter contract, so `publish`,
+  `versions`, `pull`, and `cite` behave identically everywhere (Figshare
+  mints `.vN` DOIs; Dataverse keeps one DOI across versions). `datapin
+  check` lints metadata against the DataCite floor (SPDX licenses, ORCID
+  checksums, relation types) and `check --fair` runs an F-UJI FAIR
+  assessment. `datapin export` writes
   `datapackage.json` / `ro-crate-metadata.json`; `datapin cite` fetches
   formatted citations via DOI content negotiation.
 - **A generated static site** replaces the OSF wiki: `datapin site` renders
