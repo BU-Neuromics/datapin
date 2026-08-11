@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -677,23 +678,22 @@ func (c *Client) GetRecord(ctx context.Context, rec backend.RecordID) (backend.R
 	if err := c.doJSON(ctx, "GET", "/api/datasets/:persistentId/versions"+pidQuery(pid), nil, &versions); err != nil {
 		return out, fmt.Errorf("listing versions of %s: %w", pid, err)
 	}
-	released := 0
+	// Record.Versions is oldest-first by contract; real Dataverse lists
+	// newest-first (LIVE-VERIFIED — trusting listing order pinned v1 as
+	// the just-published v2). Sort by version number, depend on nothing.
+	var released []int
 	for _, v := range versions {
 		if v.VersionState == "RELEASED" {
-			released++
+			released = append(released, v.VersionNumber)
 		}
 	}
-	n := 0
-	for _, v := range versions {
-		if v.VersionState != "RELEASED" {
-			continue
-		}
-		n++
+	sort.Ints(released)
+	for i, num := range released {
 		out.Versions = append(out.Versions, backend.VersionInfo{
-			ID:       backend.RecordID(fmt.Sprintf("%s@%d", pid, v.VersionNumber)),
-			Index:    v.VersionNumber - 1,
+			ID:       backend.RecordID(fmt.Sprintf("%s@%d", pid, num)),
+			Index:    num - 1,
 			DOI:      doi,
-			IsLatest: n == released,
+			IsLatest: i == len(released)-1,
 		})
 	}
 	return out, nil

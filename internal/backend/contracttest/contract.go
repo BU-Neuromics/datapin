@@ -234,6 +234,14 @@ func newVersionChain(t *testing.T, factory Factory) {
 	if !rec.Versions[1].IsLatest || rec.Versions[0].IsLatest {
 		t.Errorf("latest flags wrong: %+v", rec.Versions)
 	}
+	// Record.Versions is oldest-first BY CONTRACT, regardless of the
+	// backend's listing order (real Dataverse lists newest-first).
+	if rec.Versions[0].Index != 0 || rec.Versions[1].Index != 1 {
+		t.Errorf("version order wrong (want oldest first): %+v", rec.Versions)
+	}
+	if res2.RecordID != rec.Versions[1].ID {
+		t.Errorf("publish v2 returned record %s, want the newest version %s", res2.RecordID, rec.Versions[1].ID)
+	}
 
 	files, err = bk.ListFiles(ctx, res2.RecordID)
 	if err != nil {
