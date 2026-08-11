@@ -339,6 +339,11 @@ func (s *Server) registerFiles(w http.ResponseWriter, r *http.Request, rec *reco
 		case e.Transfer.Parts <= 0:
 			jsonError(w, 400, "Multipart file transfer requires parts.")
 			return
+		// S3-backed multipart caps out at 10,000 parts; bounding here also
+		// keeps the per-part slice allocation below request control.
+		case e.Transfer.Parts > 10000:
+			jsonError(w, 400, "Multipart file transfer supports at most 10000 parts.")
+			return
 		case e.Size <= 0:
 			jsonError(w, 400, "Multipart file transfer requires file size.")
 			return
