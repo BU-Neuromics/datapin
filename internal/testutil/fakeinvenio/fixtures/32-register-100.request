@@ -1,0 +1,2 @@
+POST https://sandbox.zenodo.org/api/records/585305/draft/files
+body: file keys100.json (2101 bytes, content-type application/json)

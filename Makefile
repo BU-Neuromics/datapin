@@ -1,4 +1,4 @@
-# gosf developer tasks. Run `make` (or `make help`) to list targets.
+# datapin developer tasks. Run `make` (or `make help`) to list targets.
 #
 # Live-test credentials are read from the environment, or from a git-ignored
 # .env file (copy .env.example → .env and fill it in). Nothing here contains
@@ -20,8 +20,8 @@ help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
 		| awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
-build: ## Build the gosf binary
-	$(GO) build -o gosf .
+build: ## Build the datapin binary
+	$(GO) build -o datapin .
 
 test: ## Unit tests (race detector)
 	$(GO) test -race ./...
@@ -47,7 +47,7 @@ check: fmt vet test integration ## Everything CI runs (except the live tier)
 cover: ## Merged unit + integration coverage (real end-to-end numbers)
 	rm -rf $(COVDIR); mkdir -p $(COVDIR)/unit $(COVDIR)/int
 	$(GO) test ./... -cover -args -test.gocoverdir=$(abspath $(COVDIR)/unit)
-	GOSF_COVERDIR=$(abspath $(COVDIR)/int) $(GO) test -tags integration -count=1 ./integration/...
+	DATAPIN_COVERDIR=$(abspath $(COVDIR)/int) $(GO) test -tags integration -count=1 ./integration/...
 	@echo "── merged coverage ──"
 	$(GO) tool covdata percent -i=$(COVDIR)/unit,$(COVDIR)/int
 	$(GO) tool covdata textfmt -i=$(COVDIR)/unit,$(COVDIR)/int -o=$(COVDIR)/coverage.txt

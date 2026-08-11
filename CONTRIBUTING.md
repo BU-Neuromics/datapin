@@ -1,4 +1,4 @@
-# Contributing to gosf
+# Contributing to datapin
 
 Thank you for your interest in contributing. This document explains how to get
 started, the standards the project uses, and what to expect from the review
@@ -14,9 +14,9 @@ process.
 ## Getting started
 
 ```console
-git clone https://github.com/BU-Neuromics/gosf
-cd gosf
-go build -o gosf .
+git clone https://github.com/BU-Neuromics/datapin
+cd datapin
+go build -o datapin .
 go test ./...
 ```
 
@@ -88,7 +88,7 @@ A change is ready to merge when:
 ## Reporting bugs
 
 Use the [bug report template](.github/ISSUE_TEMPLATE/bug_report.yml). Include
-the `gosf --version` output, your OS and architecture, and the exact command
+the `datapin --version` output, your OS and architecture, and the exact command
 you ran.
 
 ## Requesting features

@@ -1,0 +1,2 @@
+POST https://sandbox.zenodo.org/api/records/585309/draft/files
+[{"key":"big.bin","size":209715200,"transfer":{"type":"M","parts":2,"part_size":104857600}}]

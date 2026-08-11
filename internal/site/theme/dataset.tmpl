@@ -1,0 +1,41 @@
+<article class="dataset">
+<h1>{{.Title}}</h1>
+{{if .Descr}}<p class="descr">{{.Descr}}</p>{{end}}
+
+{{if .Published}}
+<div class="doi-box">
+  <p><strong>DOI (version {{.Version}}):</strong>
+    <a href="https://doi.org/{{.VersionDOI}}">{{.VersionDOI}}</a></p>
+  {{if .ConceptDOI}}<p><strong>Concept DOI (always latest):</strong>
+    <a href="https://doi.org/{{.ConceptDOI}}">{{.ConceptDOI}}</a></p>{{end}}
+</div>
+{{if .Citation}}
+<div class="citation">
+  <h2>Cite as</h2>
+  <blockquote>{{.Citation}}</blockquote>
+</div>
+{{end}}
+{{else}}
+<p class="unpublished">This dataset has not been published yet.</p>
+{{end}}
+
+{{if .Creators}}
+<h2>Creators</h2>
+<ul class="creators">
+{{range .Creators}}  <li>{{.Name}}{{if .ORCID}} <a class="orcid" href="https://orcid.org/{{.ORCID}}">{{.ORCID}}</a>{{end}}</li>
+{{end}}</ul>
+{{end}}
+
+<h2>Files</h2>
+<table class="files">
+<thead><tr><th>File</th><th>Size</th><th>MD5</th></tr></thead>
+<tbody>
+{{range .Files}}  <tr><td>{{.Key}}</td><td>{{.Size}}</td><td><code>{{.MD5}}</code></td></tr>
+{{end}}</tbody>
+</table>
+
+<dl class="facts">
+{{if .License}}  <dt>License</dt><dd><a href="https://spdx.org/licenses/{{.License}}.html">{{.License}}</a></dd>{{end}}
+{{if .Keywords}}  <dt>Keywords</dt><dd>{{.Keywords}}</dd>{{end}}
+</dl>
+</article>

@@ -3,7 +3,7 @@ package cmd
 import (
 	"testing"
 
-	"github.com/BU-Neuromics/gosf/internal/manifest"
+	"github.com/BU-Neuromics/datapin/internal/manifest"
 )
 
 // The skip is only valid when the latest-version fast path classifies a file

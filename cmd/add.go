@@ -8,30 +8,30 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
-	"github.com/BU-Neuromics/gosf/internal/config"
-	"github.com/BU-Neuromics/gosf/internal/log"
-	"github.com/BU-Neuromics/gosf/internal/manifest"
-	"github.com/BU-Neuromics/gosf/internal/output"
-	"github.com/BU-Neuromics/gosf/internal/pathutil"
-	"github.com/BU-Neuromics/gosf/internal/resolver"
+	"github.com/BU-Neuromics/datapin/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/config"
+	"github.com/BU-Neuromics/datapin/internal/log"
+	"github.com/BU-Neuromics/datapin/internal/manifest"
+	"github.com/BU-Neuromics/datapin/internal/output"
+	"github.com/BU-Neuromics/datapin/internal/pathutil"
+	"github.com/BU-Neuromics/datapin/internal/resolver"
 )
 
 var addCmd = &cobra.Command{
 	Use:   "add <local-path> [<project>:]<remote-path>",
-	Short: "Track a local file or directory in the gosf manifest",
-	Long: `Add a local file or directory to gosf.toml so gosf keeps it in sync with OSF.
-Use 'gosf pull' to record files that already exist on the remote.
+	Short: "Track a local file or directory in the datapin manifest",
+	Long: `Add a local file or directory to datapin.toml so datapin keeps it in sync with OSF.
+Use 'datapin pull' to record files that already exist on the remote.
 
 If <remote-path> is omitted the remote path mirrors the local path.
 If <local-path> is a directory, all files in it are added recursively.
 
 Path rules follow scp conventions:
-  gosf add data/file.txt                       remote: /data/file.txt (mirror)
-  gosf add data/file.txt abc12:/results/       remote: /results/file.txt
-  gosf add data/file.txt abc12:/results/out.txt  remote: /results/out.txt
-  gosf add data/dir/ abc12:/results/           remote: /results/<files> (contents)
-  gosf add data/dir  abc12:/results/           remote: /results/dir/<files> (dir itself)`,
+  datapin add data/file.txt                       remote: /data/file.txt (mirror)
+  datapin add data/file.txt abc12:/results/       remote: /results/file.txt
+  datapin add data/file.txt abc12:/results/out.txt  remote: /results/out.txt
+  datapin add data/dir/ abc12:/results/           remote: /results/<files> (contents)
+  datapin add data/dir  abc12:/results/           remote: /results/dir/<files> (dir itself)`,
 	Args:         cobra.RangeArgs(1, 2),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -76,15 +76,15 @@ Path rules follow scp conventions:
 			}
 		}
 
-		// Load or create gosf.toml.
+		// Load or create datapin.toml.
 		manifestPath, _, findErr := manifest.FindManifest()
 		var m *manifest.Manifest
 		manifestCreated := false
 		if manifest.IsNotFound(findErr) {
 			if nodeID == "" {
-				return fmt.Errorf("no project configured — run: gosf init <project-id>")
+				return fmt.Errorf("no project configured — run: datapin init <project-id>")
 			}
-			manifestPath = filepath.Join(".gosf", "gosf.toml")
+			manifestPath = filepath.Join(".datapin", "datapin.toml")
 			m = &manifest.Manifest{Project: manifest.ProjectConfig{ID: nodeID}}
 			manifestCreated = true
 		} else if findErr != nil {
@@ -102,7 +102,7 @@ Path rules follow scp conventions:
 			nodeID = m.Project.ID
 		}
 		if nodeID == "" {
-			return fmt.Errorf("no project configured — run: gosf init <project-id>")
+			return fmt.Errorf("no project configured — run: datapin init <project-id>")
 		}
 
 		// Determine per-entry project field (empty when nodeID matches manifest default).
@@ -127,7 +127,7 @@ Path rules follow scp conventions:
 				}
 				remotePath := pathutil.MapFilePath(localBase, remoteBase, filepath.ToSlash(path))
 				if findEntryByLocal(m, path) >= 0 {
-					return fmt.Errorf("entry with local path %q already exists in .gosf/gosf.toml", path)
+					return fmt.Errorf("entry with local path %q already exists in .datapin/datapin.toml", path)
 				}
 				e := manifest.Entry{
 					Local:   path,
@@ -149,7 +149,7 @@ Path rules follow scp conventions:
 			// Single file.
 			remotePath := pathutil.FileRemotePath(localSrc, remoteDest)
 			if findEntryByLocal(m, localSrc) >= 0 {
-				return fmt.Errorf("entry with local path %q already exists in .gosf/gosf.toml", localSrc)
+				return fmt.Errorf("entry with local path %q already exists in .datapin/datapin.toml", localSrc)
 			}
 
 			entry := manifest.Entry{

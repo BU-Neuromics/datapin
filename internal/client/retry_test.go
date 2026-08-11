@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// OSF returns Retry-After on a 429. gosf ignored it entirely: no retry, no
+// OSF returns Retry-After on a 429. datapin ignored it entirely: no retry, no
 // backoff, no wait (issue #86).
 func TestParseRetryAfter(t *testing.T) {
 	now := time.Date(2026, 7, 30, 12, 0, 0, 0, time.UTC)

@@ -5,10 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/BU-Neuromics/datapin/internal/env"
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strconv"
 	"time"
 )
@@ -27,9 +27,9 @@ type OSFClient struct {
 }
 
 // New returns an OSFClient. Pass an empty token for unauthenticated (public) access.
-// Set GOSF_API_BASE to override the default API base URL (useful in tests).
+// Set DATAPIN_API_BASE (or legacy GOSF_API_BASE) to override the default API base URL (useful in tests).
 func New(token string) *OSFClient {
-	base := os.Getenv("GOSF_API_BASE")
+	base := env.Get("API_BASE")
 	if base == "" {
 		base = metaBase
 	}

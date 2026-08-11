@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/client"
 )
 
 // A bare "OSF API 429: Request was throttled." tells the user nothing they can
@@ -18,7 +18,7 @@ func TestFriendlyAPIError_RateLimited(t *testing.T) {
 
 	t.Run("unauthenticated names the real cause", func(t *testing.T) {
 		msg := friendlyAPIError(throttled, false).Error()
-		for _, want := range []string{"rate limit", "unauthenticated", "gosf auth login"} {
+		for _, want := range []string{"rate limit", "unauthenticated", "datapin auth login"} {
 			if !strings.Contains(strings.ToLower(msg), strings.ToLower(want)) {
 				t.Errorf("message should mention %q:\n%s", want, msg)
 			}
@@ -30,7 +30,7 @@ func TestFriendlyAPIError_RateLimited(t *testing.T) {
 		if !strings.Contains(strings.ToLower(msg), "rate limit") {
 			t.Errorf("message should name the rate limit:\n%s", msg)
 		}
-		if strings.Contains(msg, "gosf auth login") {
+		if strings.Contains(msg, "datapin auth login") {
 			t.Errorf("an already-authenticated user must not be told to log in:\n%s", msg)
 		}
 		// Still needs an actionable suggestion.
@@ -44,7 +44,7 @@ func TestFriendlyAPIError_RateLimited(t *testing.T) {
 func TestFriendlyAPIError_StillHandlesAuthErrors(t *testing.T) {
 	for _, code := range []int{401, 403} {
 		err := friendlyAPIError(&client.APIError{StatusCode: code, Message: "no"}, false)
-		if !strings.Contains(err.Error(), "gosf auth login") {
+		if !strings.Contains(err.Error(), "datapin auth login") {
 			t.Errorf("HTTP %d should still produce the auth hint, got %v", code, err)
 		}
 	}

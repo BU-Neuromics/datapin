@@ -12,7 +12,7 @@ func TestWikiPush_CreateAndCanonicalRoundTrip(t *testing.T) {
 	e := newTestEnv(t)
 	e.srv.AddProject("abc12", "Wiki Project")
 	// Push content with CRLF and a trailing newline. OSF (and the fake) store the
-	// canonical form; gosf compares canonically, so this is what round-trips.
+	// canonical form; datapin compares canonically, so this is what round-trips.
 	e.writeFile("Protocol.md", "# Protocol\r\nstep one\n\nno trailing newline\n")
 
 	stdout, stderr, code := e.run("wiki", "push", "Protocol.md", "abc12", "--output=json")

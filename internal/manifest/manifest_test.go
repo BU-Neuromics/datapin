@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/BU-Neuromics/gosf/internal/manifest"
+	"github.com/BU-Neuromics/datapin/internal/manifest"
 )
 
 // ---- helpers ----
@@ -41,7 +41,7 @@ md5       = "098f6bcd4621d373cade4e832627b4f6"
 
 func TestLoad_HappyPath(t *testing.T) {
 	dir := t.TempDir()
-	p := writeFile(t, dir, "gosf.toml", validTOML)
+	p := writeFile(t, dir, "datapin.toml", validTOML)
 
 	m, err := manifest.Load(p)
 	if err != nil {
@@ -78,7 +78,7 @@ version   = 0
 md5       = ""
 project   = "xyz89"
 `
-	p := writeFile(t, dir, "gosf.toml", toml)
+	p := writeFile(t, dir, "datapin.toml", toml)
 	m, err := manifest.Load(p)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -106,7 +106,7 @@ remote    = "/data/other.h5"
 version   = 0
 md5       = ""
 `
-	p := writeFile(t, dir, "gosf.toml", toml)
+	p := writeFile(t, dir, "datapin.toml", toml)
 	_, err := manifest.Load(p)
 	if err == nil {
 		t.Fatal("expected error for duplicate local path")
@@ -134,7 +134,7 @@ remote    = "/data/same.h5"
 version   = 0
 md5       = ""
 `
-	p := writeFile(t, dir, "gosf.toml", toml)
+	p := writeFile(t, dir, "datapin.toml", toml)
 	_, err := manifest.Load(p)
 	if err == nil {
 		t.Fatal("expected error for duplicate (project, remote) pair")
@@ -151,7 +151,7 @@ remote    = "/data/counts.h5"
 version   = 0
 md5       = ""
 `
-	p := writeFile(t, dir, "gosf.toml", toml)
+	p := writeFile(t, dir, "datapin.toml", toml)
 	_, err := manifest.Load(p)
 	if err == nil {
 		t.Fatal("expected error when no project can be resolved")
@@ -169,7 +169,7 @@ func TestLoad_NotFound(t *testing.T) {
 
 func TestSave_Roundtrip(t *testing.T) {
 	dir := t.TempDir()
-	p := writeFile(t, dir, "gosf.toml", validTOML)
+	p := writeFile(t, dir, "datapin.toml", validTOML)
 
 	m, err := manifest.Load(p)
 	if err != nil {
@@ -208,7 +208,7 @@ func TestSave_Atomic(t *testing.T) {
 	// that the file is replaced as a unit (temp+rename) by checking the
 	// original file path survives and is valid TOML after Save.
 	dir := t.TempDir()
-	p := writeFile(t, dir, "gosf.toml", validTOML)
+	p := writeFile(t, dir, "datapin.toml", validTOML)
 	m, _ := manifest.Load(p)
 	m.Files[0].Version = 99
 
@@ -229,8 +229,8 @@ func TestSave_Atomic(t *testing.T) {
 
 func TestFindManifest_InCwd(t *testing.T) {
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".gosf"), 0755)
-	writeFile(t, filepath.Join(dir, ".gosf"), "gosf.toml", validTOML)
+	os.MkdirAll(filepath.Join(dir, ".datapin"), 0755)
+	writeFile(t, filepath.Join(dir, ".datapin"), "datapin.toml", validTOML)
 
 	// Temporarily change cwd.
 	origDir, _ := os.Getwd()
@@ -241,8 +241,8 @@ func TestFindManifest_InCwd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FindManifest: %v", err)
 	}
-	if manifestPath != filepath.Join(dir, ".gosf", "gosf.toml") {
-		t.Errorf("manifestPath = %q, want %q", manifestPath, filepath.Join(dir, ".gosf", "gosf.toml"))
+	if manifestPath != filepath.Join(dir, ".datapin", "datapin.toml") {
+		t.Errorf("manifestPath = %q, want %q", manifestPath, filepath.Join(dir, ".datapin", "datapin.toml"))
 	}
 	if repoRoot != dir {
 		t.Errorf("repoRoot = %q, want %q", repoRoot, dir)
@@ -251,8 +251,8 @@ func TestFindManifest_InCwd(t *testing.T) {
 
 func TestFindManifest_InParentDir(t *testing.T) {
 	root := t.TempDir()
-	os.MkdirAll(filepath.Join(root, ".gosf"), 0755)
-	writeFile(t, filepath.Join(root, ".gosf"), "gosf.toml", validTOML)
+	os.MkdirAll(filepath.Join(root, ".datapin"), 0755)
+	writeFile(t, filepath.Join(root, ".datapin"), "datapin.toml", validTOML)
 	subdir := filepath.Join(root, "deep", "nested")
 	os.MkdirAll(subdir, 0755)
 
@@ -271,8 +271,8 @@ func TestFindManifest_InParentDir(t *testing.T) {
 }
 
 func TestFindManifest_NotFound(t *testing.T) {
-	// Use an empty temp dir that has no gosf.toml anywhere above it
-	// (temp dirs are typically under /tmp which shouldn't have a gosf.toml).
+	// Use an empty temp dir that has no datapin.toml anywhere above it
+	// (temp dirs are typically under /tmp which shouldn't have a datapin.toml).
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
 	t.Cleanup(func() { os.Chdir(origDir) })
@@ -280,7 +280,7 @@ func TestFindManifest_NotFound(t *testing.T) {
 
 	_, _, err := manifest.FindManifest()
 	if err == nil {
-		t.Fatal("expected NotFoundError when no gosf.toml exists")
+		t.Fatal("expected NotFoundError when no datapin.toml exists")
 	}
 	if !manifest.IsNotFound(err) {
 		t.Errorf("expected NotFoundError, got %T: %v", err, err)

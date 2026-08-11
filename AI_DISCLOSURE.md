@@ -1,11 +1,11 @@
 # AI Disclosure
 
 This document describes how generative AI tools were used in the creation of
-`gosf` and the role played by the human author.
+`datapin` and the role played by the human author.
 
 ## What was built with AI assistance
 
-`gosf` was developed through an extended pair-programming session between
+`datapin` was developed through an extended pair-programming session between
 **Adam Labadorf** (BU Neuromics, Boston University) and
 **Claude Code** (Anthropic's AI coding assistant, claude-sonnet-4-6).
 
@@ -23,7 +23,7 @@ Adam Labadorf's role was that of **technical director and product owner**:
   `osfclient`, defined the scope as a single-binary Go CLI, and chose the target
   audience (researchers on HPC systems).
 - **Made all product decisions** — determined which commands to include, the
-  `gosf.toml` manifest design, conflict-handling semantics, token priority chain,
+  `datapin.toml` manifest design, conflict-handling semantics, token priority chain,
   JSON output contract, and the six-state sync model.
 - **Set and enforced development standards** — mandated test-driven development
   (red-green-refactor), required regression tests for every bug fix, established

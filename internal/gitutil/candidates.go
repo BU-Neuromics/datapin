@@ -20,11 +20,11 @@ type Candidate struct {
 }
 
 // excludedTop are top-level directories never offered as candidates.
-var excludedTop = map[string]bool{".git": true, ".gosf": true}
+var excludedTop = map[string]bool{".git": true, ".datapin": true}
 
 // Candidates returns the files under root that git does not track (ignored +
 // untracked). If root is not a git work tree (or git is unavailable), it returns
-// every regular file under root instead. `.git` and `.gosf` are always excluded.
+// every regular file under root instead. `.git` and `.datapin` are always excluded.
 // Results are sorted by path.
 func Candidates(root string) ([]Candidate, error) {
 	rels, err := gitUntracked(root)

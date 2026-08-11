@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# gosf installer — Linux and macOS
+# datapin installer — Linux and macOS
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/BU-Neuromics/gosf/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/BU-Neuromics/datapin/main/install.sh | bash
 #
 # Override install directory:
-#   GOSF_INSTALL_DIR=~/.local/bin curl -fsSL ... | bash
+#   DATAPIN_INSTALL_DIR=~/.local/bin curl -fsSL ... | bash
 
 set -euo pipefail
 
-REPO="BU-Neuromics/gosf"
-BINARY="gosf"
+REPO="BU-Neuromics/datapin"
+BINARY="datapin"
 
 # ---- output helpers ----
 
@@ -40,8 +40,8 @@ esac
 
 # ---- choose install directory ----
 
-if [ -n "${GOSF_INSTALL_DIR:-}" ]; then
-  INSTALL_DIR="$GOSF_INSTALL_DIR"
+if [ -n "${DATAPIN_INSTALL_DIR:-}" ]; then
+  INSTALL_DIR="$DATAPIN_INSTALL_DIR"
 elif [ -w /usr/local/bin ]; then
   INSTALL_DIR=/usr/local/bin
 else

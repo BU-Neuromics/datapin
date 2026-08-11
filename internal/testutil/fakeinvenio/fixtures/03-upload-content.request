@@ -1,0 +1,2 @@
+PUT https://sandbox.zenodo.org/api/records/585300/draft/files/data.txt/content
+body: file data.txt (17 bytes, content-type application/octet-stream)

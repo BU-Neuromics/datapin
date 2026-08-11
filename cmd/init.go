@@ -5,25 +5,25 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/BU-Neuromics/gosf/internal/log"
-	"github.com/BU-Neuromics/gosf/internal/manifest"
-	"github.com/BU-Neuromics/gosf/internal/output"
+	"github.com/BU-Neuromics/datapin/internal/log"
+	"github.com/BU-Neuromics/datapin/internal/manifest"
+	"github.com/BU-Neuromics/datapin/internal/output"
 )
 
 var initCmd = &cobra.Command{
 	Use:   "init <project-id>",
-	Short: "Initialize .gosf/gosf.toml with an OSF project ID",
-	Long: `Create or update .gosf/gosf.toml in the current directory, setting [project].id.
+	Short: "Initialize .datapin/datapin.toml with an OSF project ID",
+	Long: `Create or update .datapin/datapin.toml in the current directory, setting [project].id.
 
-If .gosf/gosf.toml already exists its [[files]] entries are preserved; only the
+If .datapin/datapin.toml already exists its [[files]] entries are preserved; only the
 project ID is updated.
 
-After running gosf init, bare 'gosf pull' and 'gosf push' will operate
+After running datapin init, bare 'datapin pull' and 'datapin push' will operate
 against the configured project.
 
 Examples:
-  gosf init abc12
-  gosf init abc12 --output=json`,
+  datapin init abc12
+  datapin init abc12 --output=json`,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -44,7 +44,7 @@ Examples:
 		}
 
 		if created {
-			log.Infof("initialized gosf project %s (%s created)", projectID, path)
+			log.Infof("initialized datapin project %s (%s created)", projectID, path)
 		} else {
 			log.Infof("updated project ID to %s in %s", projectID, path)
 		}

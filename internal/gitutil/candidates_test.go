@@ -43,10 +43,10 @@ func TestCandidates_GitRepo(t *testing.T) {
 
 	write(t, root, "tracked.go", "package main")
 	write(t, root, ".gitignore", "ignored/\n*.tmp\n")
-	write(t, root, "ignored/data.csv", "x")   // git-ignored
-	write(t, root, "scratch.tmp", "x")        // git-ignored
-	write(t, root, "untracked.csv", "x")      // untracked, not ignored
-	write(t, root, ".gosf/gosf.toml", "junk") // must be excluded
+	write(t, root, "ignored/data.csv", "x")         // git-ignored
+	write(t, root, "scratch.tmp", "x")              // git-ignored
+	write(t, root, "untracked.csv", "x")            // untracked, not ignored
+	write(t, root, ".datapin/datapin.toml", "junk") // must be excluded
 	// stage + commit the tracked file so it's "tracked", not "untracked".
 	for _, args := range [][]string{{"add", "tracked.go", ".gitignore"}, {"commit", "-m", "init"}} {
 		cmd := exec.Command("git", args...)
@@ -66,7 +66,7 @@ func TestCandidates_GitRepo(t *testing.T) {
 			t.Errorf("expected candidate %q, got %v", want, cs)
 		}
 	}
-	for _, notWant := range []string{"tracked.go", ".gitignore", ".gosf/gosf.toml"} {
+	for _, notWant := range []string{"tracked.go", ".gitignore", ".datapin/datapin.toml"} {
 		if got[notWant] {
 			t.Errorf("did not expect candidate %q (tracked or excluded)", notWant)
 		}
@@ -77,7 +77,7 @@ func TestCandidates_NonGitDir_FallsBackToAll(t *testing.T) {
 	root := t.TempDir()
 	write(t, root, "a.csv", "aa")
 	write(t, root, "sub/b.txt", "bbb")
-	write(t, root, ".gosf/gosf.toml", "junk")
+	write(t, root, ".datapin/datapin.toml", "junk")
 
 	cs, err := Candidates(root)
 	if err != nil {
@@ -87,8 +87,8 @@ func TestCandidates_NonGitDir_FallsBackToAll(t *testing.T) {
 	if !got["a.csv"] || !got["sub/b.txt"] {
 		t.Errorf("expected all files outside a git repo, got %v", cs)
 	}
-	if got[".gosf/gosf.toml"] {
-		t.Errorf(".gosf must be excluded, got %v", cs)
+	if got[".datapin/datapin.toml"] {
+		t.Errorf(".datapin must be excluded, got %v", cs)
 	}
 	// sizes are populated
 	for _, c := range cs {

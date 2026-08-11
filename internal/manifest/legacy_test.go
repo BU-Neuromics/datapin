@@ -6,15 +6,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/BU-Neuromics/gosf/internal/manifest"
+	"github.com/BU-Neuromics/datapin/internal/manifest"
 )
 
-// A manifest written by gosf ≤1.9 carries a `direction` key on every entry.
+// A manifest written by datapin ≤1.9 carries a `direction` key on every entry.
 // The field is retired (issue #81), but old manifests must keep working: the
 // key is accepted and ignored, never a load error.
 func TestLoad_LegacyDirectionKeyIsAcceptedAndIgnored(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "gosf.toml")
+	path := filepath.Join(dir, "datapin.toml")
 	content := `[project]
 id = "abc12"
 
@@ -60,7 +60,7 @@ md5       = "bb"
 // A manifest with no `direction` anywhere is now the normal case and must load.
 func TestLoad_NoDirectionIsValid(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "gosf.toml")
+	path := filepath.Join(dir, "datapin.toml")
 	content := `[project]
 id = "abc12"
 
@@ -86,7 +86,7 @@ version = 0
 // other field, including [[wikis]] (guards #80).
 func TestSave_DropsLegacyDirectionAndKeepsEverythingElse(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "gosf.toml")
+	path := filepath.Join(dir, "datapin.toml")
 	content := `[project]
 id = "abc12"
 

@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// OSF's JSON:API defaults to 10 items per page and caps at 100. gosf never
+// OSF's JSON:API defaults to 10 items per page and caps at 100. datapin never
 // asked for a size, so every listing took the default and a folder of 87 files
 // cost 9 requests instead of 1 — the dominant source of rate-limit pressure
 // (issue #86).

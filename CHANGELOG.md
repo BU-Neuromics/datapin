@@ -5,6 +5,53 @@ All notable changes to this project will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+> **Rename notice (2026-08-10):** this project was rebooted from `gosf` to
+> **`datapin`** (see `docs/reboot-plan.md`). Versioning restarts at `v0.1.0`
+> under the datapin name; the `[1.x]`/`[2.x]` entries below record the tool's
+> previous life as gosf and are kept verbatim (their release links point at
+> the original gosf repository).
+
+## [0.1.0] - 2026-08-11
+
+The reboot release: datapin is now a FAIR data publication tool. Everything
+gosf did (OSF workspace sync, wikis, the state-gated manifest workflow)
+still works — including legacy `.gosf/gosf.toml` manifests, `~/.config/gosf`
+tokens, and `GOSF_*` env vars, all read with deprecation warnings.
+
+### Added
+
+- **Archive remotes** (`datapin remote add/ls/rm`): named Zenodo/InvenioRDM
+  backends with per-remote tokens (`DATAPIN_TOKEN_<NAME>` env > OS keychain
+  > token file) and instance probing.
+- **Dataset publication** (`datapin publish`): manifest `[[datasets]]`
+  publish as immutable, versioned, DOI-carrying records. Per-key transaction
+  planning (unchanged files carry over server-side via files-import; only
+  changed content transfers), loud PUBLIC/PERMANENT confirmation, crashed-run
+  recovery, atomic re-pinning, DOI + paste-ready citation on every publish.
+  `--reserve` mints the DOI before the data is final; `--dry-run`, `--force`.
+- **Archive reads**: `versions <slug>` (version chain with DOIs),
+  `pull <slug> [--latest]` (checksum-verified restore of pinned bytes),
+  `open <slug>`, dataset rows in `status`.
+- **Metadata quality** (`datapin check [--fair]`): DataCite-floor linting
+  (SPDX license ids with suggestions, ORCID ISO 7064 checksums, DataCite
+  relation types, NC/ND warnings); errors are exactly what publish refuses.
+  `--fair` runs an F-UJI FAIR assessment of the published DOI.
+- **Standard exports** (`datapin export`): `datapackage.json` (Data Package
+  v2) and `ro-crate-metadata.json` (RO-Crate 1.2).
+- **Citations** (`datapin cite [--bibtex]`): DOI content negotiation with a
+  local fallback for sandbox DOIs.
+- **Documentation site** (`datapin site build/preview/publish`): goldmark
+  pipeline, embedded light/dark theme, citation-ready dataset landing pages
+  with schema.org JSON-LD, sitemap, orphan-commit gh-pages deploy with
+  first-run Pages enablement.
+- Manifest schema 2 (additive), Zenodo sandbox live test tier, hermetic
+  `fakeinvenio` server, Phase 0 API findings in `docs/zenodo-notes.md`.
+
+### Changed
+
+- Module path `github.com/BU-Neuromics/datapin`; binary `datapin`; manifest
+  `.datapin/datapin.toml`; config `~/.config/datapin`; env vars `DATAPIN_*`.
+
 ## [2.1.0] - 2026-07-31
 
 Rate-limit resilience. Projects with more than a handful of tracked files were

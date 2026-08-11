@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/client"
 )
 
 func TestWaterbutler_Rename(t *testing.T) {
@@ -112,7 +112,7 @@ func TestWaterbutler_CreateFolder(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	t.Setenv("GOSF_FILES_BASE", srv.URL)
+	t.Setenv("DATAPIN_FILES_BASE", srv.URL)
 	wb := client.NewWaterbutler("tok")
 	// Subfolder create URL, derived from a parent folder's ID-based upload link.
 	base := srv.URL + "/v1/resources/abc12/providers/osfstorage/d5/"
@@ -140,7 +140,7 @@ func TestWaterbutler_CreateFolder_Root(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	t.Setenv("GOSF_FILES_BASE", srv.URL)
+	t.Setenv("DATAPIN_FILES_BASE", srv.URL)
 	wb := client.NewWaterbutler("tok")
 	err := wb.CreateFolder(context.Background(), client.AppendFolderName(client.RootUploadURL("abc12"), "toplevel"))
 	if err != nil {

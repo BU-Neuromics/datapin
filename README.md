@@ -1,19 +1,60 @@
-# gosf
+# datapin
 
-[![CI](https://github.com/BU-Neuromics/gosf/actions/workflows/ci.yml/badge.svg)](https://github.com/BU-Neuromics/gosf/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/BU-Neuromics/gosf)](https://github.com/BU-Neuromics/gosf/releases)
+[![CI](https://github.com/BU-Neuromics/datapin/actions/workflows/ci.yml/badge.svg)](https://github.com/BU-Neuromics/datapin/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/BU-Neuromics/datapin)](https://github.com/BU-Neuromics/datapin/releases)
 
-`gosf` is a fast, single-binary command-line tool for pushing and pulling files
-to and from the [Open Science Framework](https://osf.io) (OSF). It is a
-maintained replacement for the Python `osfclient`, distributed as a static
-binary with no runtime dependencies.
+**Pin, sync, and publish research data.** `datapin` is a fast, single-binary
+CLI that keeps a project's data files verifiably in sync with remote storage
+through a committed manifest with git-like safety gates: run your analysis on
+the cluster, `datapin push` the results, `git clone` the repo anywhere, and
+`datapin pull` reproduces them — every file pinned to an exact version and
+MD5.
+
+Beyond workspace sync (against the [Open Science Framework](https://osf.io) —
+datapin began life as `gosf`, a maintained replacement for the Python
+`osfclient`), datapin is a **FAIR data publication tool**: group files into
+datasets and `datapin publish` them to [Zenodo](https://zenodo.org) (or any
+InvenioRDM instance) as immutable, versioned, DOI-carrying records — with
+metadata linting, standard metadata exports, citations, and a generated
+static documentation site with citation-ready dataset landing pages.
 
 ```console
-$ gosf pull abc12:/data/results.csv
-$ gosf push ./figures/ abc12:/manuscript/figures/
-$ gosf ls abc12:/data
-$ gosf wiki push docs/home.md abc12:home
+$ datapin publish counts           # dataset → Zenodo record + DOI + citation
+$ datapin check --fair             # DataCite/SPDX/ORCID lint + F-UJI score
+$ datapin site publish             # dataset landing pages → GitHub Pages
+$ datapin pull abc12:/data/results.csv     # OSF workspace sync, as ever
 ```
+
+## Publish a dataset in five minutes
+
+```console
+$ datapin remote add https://sandbox.zenodo.org --name sandbox   # rehearse on sandbox first!
+$ $EDITOR .datapin/datapin.toml    # declare a [[datasets]] block (below)
+$ datapin check                    # metadata lint: what publish would refuse
+$ datapin publish counts           # plan → confirm → transaction → DOI + citation
+$ datapin versions counts          # the version chain, DOIs, and your pin
+```
+
+```toml
+[project]
+default_archive = "sandbox"
+
+[[datasets]]
+slug = "counts"
+  [datasets.metadata]
+  title   = "Aligned RNA-seq count matrices"
+  license = "CC0-1.0"
+  [[datasets.metadata.creators]]
+  name  = "Labadorf, Adam"
+  orcid = "0000-0002-…"
+  [[datasets.files]]
+  local = "results/counts.h5"
+```
+
+Publishing again after editing files opens a new version: unchanged files are
+carried over server-side (no re-upload), only changed content transfers, and
+a fresh version DOI is minted under the stable concept DOI. `datapin pull
+counts` restores the pinned bytes anywhere the repo is cloned.
 
 ## Features
 
@@ -31,26 +72,69 @@ $ gosf wiki push docs/home.md abc12:home
   a TTY or under `--quiet`/`--output=json`; controllable with `--color`).
 - **Ctrl-C aware** — cancels in-flight transfers cleanly and never leaves
   half-downloaded files behind.
-- **Sync manifest** — declare files in `.gosf/gosf.toml` and keep them in sync
-  with `gosf sync`; CI-friendly status with `gosf status`.
+- **Sync manifest** — declare files in `.datapin/datapin.toml` and keep them in sync
+  with `datapin sync`; CI-friendly status with `datapin status`.
 - **Project wikis** — read, write, and sync a project's versioned markdown wiki
-  pages (`gosf wiki`), including manifest-driven sync of local `.md` files.
+  pages (`datapin wiki`), including manifest-driven sync of local `.md` files.
+
+## FAIR data publication
+
+datapin is the reboot of [`gosf`](https://github.com/BU-Neuromics/gosf) as a
+multi-backend FAIR data publication tool. What ships today:
+
+- **Workspace remotes** (OSF; S3-compatible and SFTP planned) keep the
+  mutable push/pull/sync workflow for intermediate results — no DOIs, no
+  metadata ceremony.
+- **Archive backends** (Zenodo and any InvenioRDM instance; Figshare and
+  Dataverse planned): `datapin publish` promotes a dataset to an immutable,
+  versioned, DOI-carrying record. `datapin check` lints metadata against the
+  DataCite floor (SPDX licenses, ORCID checksums, relation types) and
+  `check --fair` runs an F-UJI FAIR assessment. `datapin export` writes
+  `datapackage.json` / `ro-crate-metadata.json`; `datapin cite` fetches
+  formatted citations via DOI content negotiation.
+- **A generated static site** replaces the OSF wiki: `datapin site` renders
+  markdown pages plus citation-ready dataset landing pages (checksums,
+  DOI links, schema.org JSON-LD) and deploys to GitHub Pages as a single
+  orphan commit.
+
+Rehearse every publish against [sandbox.zenodo.org](https://sandbox.zenodo.org)
+(`datapin remote add https://sandbox.zenodo.org --name sandbox`) — publishing
+to production Zenodo is permanent and public, and its DOIs resolve forever.
+
+The full architecture and phased roadmap live in
+[`docs/reboot-plan.md`](./docs/reboot-plan.md); operational decisions are in
+[`docs/datapin-handoff.md`](./docs/datapin-handoff.md) and
+[`docs/decisions.md`](./docs/decisions.md). Verified Zenodo API behaviors:
+[`docs/zenodo-notes.md`](./docs/zenodo-notes.md).
+
+### Migrating from gosf
+
+Existing gosf setups keep working: a legacy `.gosf/gosf.toml` manifest is
+found and read automatically (read-only — rename it to
+`.datapin/datapin.toml` to write), `~/.config/gosf` config/tokens are read
+when the datapin ones are absent, and `GOSF_*` environment variables are
+accepted with a deprecation warning. To migrate a repo:
+
+```console
+$ mv .gosf .datapin && mv .datapin/gosf.toml .datapin/datapin.toml
+$ datapin auth login   # re-store your token under datapin
+```
 
 ## For coding agents
 
-`gosf` ships a [skills.sh](https://skills.sh) agent skill so AI coding agents can
+`datapin` ships a [skills.sh](https://skills.sh) agent skill so AI coding agents can
 understand and invoke it without hand-written instructions.
 
 Install the skill in your project (supported by Claude Code, GitHub Copilot,
 Codex, and 38+ other agents):
 
 ```console
-npx skills add BU-Neuromics/gosf
+npx skills add BU-Neuromics/datapin
 ```
 
 The skill covers installation, authentication, path syntax, the
-`.gosf/gosf.toml` manifest, every command, and common workflows. The source
-lives in [`skills/gosf/SKILL.md`](./skills/gosf/SKILL.md).
+`.datapin/datapin.toml` manifest, every command, and common workflows. The source
+lives in [`skills/datapin/SKILL.md`](./skills/datapin/SKILL.md).
 
 ## Installation
 
@@ -59,51 +143,51 @@ lives in [`skills/gosf/SKILL.md`](./skills/gosf/SKILL.md).
 **Linux / macOS**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BU-Neuromics/gosf/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/BU-Neuromics/datapin/main/install.sh | bash
 ```
 
 Detects your OS and architecture, downloads the right binary, verifies the
 SHA-256 checksum, and installs to `/usr/local/bin` (or `~/.local/bin` if
 `/usr/local/bin` is not writable). Override the destination with
-`GOSF_INSTALL_DIR`:
+`DATAPIN_INSTALL_DIR`:
 
 ```bash
-GOSF_INSTALL_DIR=~/.local/bin curl -fsSL https://raw.githubusercontent.com/BU-Neuromics/gosf/main/install.sh | bash
+DATAPIN_INSTALL_DIR=~/.local/bin curl -fsSL https://raw.githubusercontent.com/BU-Neuromics/datapin/main/install.sh | bash
 ```
 
 **Windows (PowerShell)**
 
 ```powershell
-irm https://raw.githubusercontent.com/BU-Neuromics/gosf/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/BU-Neuromics/datapin/main/install.ps1 | iex
 ```
 
-Installs to `%LOCALAPPDATA%\Programs\gosf` and adds it to your user `PATH`.
-Override with `$env:GOSF_INSTALL_DIR`.
+Installs to `%LOCALAPPDATA%\Programs\datapin` and adds it to your user `PATH`.
+Override with `$env:DATAPIN_INSTALL_DIR`.
 
 ### Pre-built binary (manual)
 
 Download the archive for your platform from the
-[releases page](https://github.com/BU-Neuromics/gosf/releases), verify the
-checksum against `checksums.txt`, extract, and put `gosf` on your `PATH`:
+[releases page](https://github.com/BU-Neuromics/datapin/releases), verify the
+checksum against `checksums.txt`, extract, and put `datapin` on your `PATH`:
 
 ```console
 # Linux x86_64 example
-tar -xzf gosf_*_linux_amd64.tar.gz
-sudo mv gosf /usr/local/bin/
+tar -xzf datapin_*_linux_amd64.tar.gz
+sudo mv datapin /usr/local/bin/
 ```
 
 ### With Go
 
 ```console
-go install github.com/BU-Neuromics/gosf@latest
+go install github.com/BU-Neuromics/datapin@latest
 ```
 
 ### From source
 
 ```console
-git clone https://github.com/BU-Neuromics/gosf
-cd gosf
-go build -o gosf .
+git clone https://github.com/BU-Neuromics/datapin
+cd datapin
+go build -o datapin .
 ```
 
 ## Authentication
@@ -116,7 +200,7 @@ projects or to upload, you need a personal access token.
 2. Log in:
 
    ```console
-   $ gosf auth login
+   $ datapin auth login
    Enter your OSF personal access token: ********
    Logged in as Ada Lovelace (a1b2c)
    ```
@@ -124,33 +208,33 @@ projects or to upload, you need a personal access token.
 3. Check status anytime:
 
    ```console
-   $ gosf auth status
+   $ datapin auth status
    Logged in as: Ada Lovelace (a1b2c)
    Token from:   OS keychain
    ```
 
 ### Where the token comes from
 
-`gosf` resolves a token from the first source that has one:
+`datapin` resolves a token from the first source that has one:
 
 | Priority | Source |
 |----------|--------|
 | 1 | `--token` flag |
 | 2 | `OSF_TOKEN` environment variable |
-| 3 | Token file (`~/.config/gosf/token`) |
+| 3 | Token file (`~/.config/datapin/token`) |
 | 4 | OS keychain |
 
-If none are set, `gosf` runs unauthenticated (public projects only).
+If none are set, `datapin` runs unauthenticated (public projects only).
 
 ### Headless / HPC systems
 
 If there's no OS keychain available, store the token in a local token file instead:
 
 ```console
-gosf auth login --no-keychain
+datapin auth login --no-keychain
 ```
 
-The token is written to `~/.config/gosf/token` with mode `0600`. This file is
+The token is written to `~/.config/datapin/token` with mode `0600`. This file is
 separate from `config.toml` so the config file remains safe to commit to version
 control.
 
@@ -158,7 +242,7 @@ Or skip persistent storage entirely and use the environment variable:
 
 ```console
 export OSF_TOKEN=your-token-here
-gosf ls abc12
+datapin ls abc12
 ```
 
 The token is never printed in logs or error output.
@@ -166,12 +250,12 @@ The token is never printed in logs or error output.
 ### Logging out
 
 ```console
-gosf auth logout
+datapin auth logout
 ```
 
 Removes the token file and (best-effort) the OS keychain entry. If the keychain
 is locked or unavailable, logout still succeeds and prints a warning — the token
-file, which gosf controls directly, is always removed.
+file, which datapin controls directly, is always removed.
 
 ## Path syntax
 
@@ -191,7 +275,7 @@ abc12/xyz34:/path             # path inside component xyz34 of project abc12
 
 ## Commands
 
-### `gosf onboard`
+### `datapin onboard`
 
 Guided, interactive setup — the easiest way to start. It detects your current
 state and resumes at the right step, so it's safe to re-run:
@@ -201,39 +285,39 @@ state and resumes at the right step, so it's safe to re-run:
 3. **Select files to push** — a collapsible file-tree of the things git doesn't
    track (data, models, artifacts); check individual files or whole directories.
 
-It records your picks in `.gosf/gosf.toml` and stops there; run `gosf sync` to
+It records your picks in `.datapin/datapin.toml` and stops there; run `datapin sync` to
 upload. Requires an interactive terminal.
 
 ```console
-$ gosf onboard
-$ gosf onboard --project abc12 --remote-base /inputs   # skip the prompts
+$ datapin onboard
+$ datapin onboard --project abc12 --remote-base /inputs   # skip the prompts
 ```
 
-### `gosf ls <project>[:<path>]`
+### `datapin ls <project>[:<path>]`
 
 List files and folders.
 
 ```console
-$ gosf ls abc12:/data
+$ datapin ls abc12:/data
 NAME          SIZE      MODIFIED
 results/      —         2024-02-02 12:00
 notes.txt     1.2 KB    2024-01-15 09:30
 ```
 
-### `gosf pull <project>[:<path>] [dest]`
+### `datapin pull <project>[:<path>] [dest]`
 
 Download a file or an entire folder tree.
 
 ```console
-$ gosf pull abc12:/data/results.csv            # → ./results.csv
-$ gosf pull abc12:/data/results.csv out.csv    # → ./out.csv
-$ gosf pull abc12:/data/ ./local-copy          # download the folder tree
-$ gosf pull abc12: --dry-run                   # preview a whole-project pull
-$ gosf pull abc12:/data/counts.h5 --version=2  # download a specific version
+$ datapin pull abc12:/data/results.csv            # → ./results.csv
+$ datapin pull abc12:/data/results.csv out.csv    # → ./out.csv
+$ datapin pull abc12:/data/ ./local-copy          # download the folder tree
+$ datapin pull abc12: --dry-run                   # preview a whole-project pull
+$ datapin pull abc12:/data/counts.h5 --version=2  # download a specific version
 ```
 
 A pull is **idempotent**: if the local file already matches the remote (same
-MD5), the download is skipped. With no path argument, `gosf pull` downloads every
+MD5), the download is skipped. With no path argument, `datapin pull` downloads every
 tracked entry that is missing locally or behind the remote; locally modified
 files are reported and left alone unless `--force` is given.
 
@@ -241,9 +325,9 @@ Flags:
 - `--version=<n>` — download a specific historical version instead of the latest.
   Only valid for single-file targets; errors for directory pulls.
 - `--force` — overwrite a locally-modified file with the tracked version.
-- `--track-only` — record the matched files in `.gosf/gosf.toml` without
+- `--track-only` — record the matched files in `.datapin/datapin.toml` without
   transferring any bytes, so a large remote can be adopted and reviewed before it
-  is downloaded. The entries land as `MISSING`; a plain `gosf sync` then fetches
+  is downloaded. The entries land as `MISSING`; a plain `datapin sync` then fetches
   them. (`sync` only ever visits entries in the manifest, so this is how remote
   files that nothing tracks become visible to it.)
 - `--resolve=theirs` — resolve a diverged file (changed both locally and
@@ -251,20 +335,20 @@ Flags:
 - `--dry-run` — list what would be downloaded without writing any files.
 
 ```console
-$ gosf pull abc12:/data/ data/ --track-only   # register 900 files, download none
-$ gosf status                                 # review what you just adopted
-$ gosf sync                                   # now fetch them
+$ datapin pull abc12:/data/ data/ --track-only   # register 900 files, download none
+$ datapin status                                 # review what you just adopted
+$ datapin sync                                   # now fetch them
 ```
 
-### `gosf push <src> <project>:<path>`
+### `datapin push <src> <project>:<path>`
 
 Upload a file or directory. With a trailing slash, the destination is treated
 as a folder and the source filename is kept.
 
 ```console
-$ gosf push results.csv abc12:/data/results.csv
-$ gosf push ./figures/  abc12:/manuscript/figures/
-$ gosf push data.csv    abc12:/data/data.csv --conflict=overwrite
+$ datapin push results.csv abc12:/data/results.csv
+$ datapin push ./figures/  abc12:/manuscript/figures/
+$ datapin push data.csv    abc12:/data/data.csv --conflict=overwrite
 ```
 
 A push is **idempotent**: uploading a file whose bytes already match the remote
@@ -278,7 +362,7 @@ Conflict handling for an *explicit* push (`--conflict`, default `skip`):
 | `overwrite` | Replace it with the local file (new version) |
 | `rename` | Upload as `name_1.ext`, `name_2.ext`, … |
 
-With no arguments, `gosf push` publishes every tracked file that holds local work
+With no arguments, `datapin push` publishes every tracked file that holds local work
 the remote does not have — files modified since they were last synced, and files
 never pushed. Because that writes remote data, it prints a per-file plan
 (project title + visibility, the action per file, sizes and MD5s) and asks for
@@ -289,88 +373,88 @@ confirmation:
 - `--resolve=ours` — resolve a diverged file by taking the local copy.
 - In `--output=json` mode, `--force` is required (there is no prompt).
 
-### `gosf rm <project>:<path>`
+### `datapin rm <project>:<path>`
 
 Delete a file or folder. Prompts for confirmation unless `--yes` is given.
 
 ```console
-$ gosf rm abc12:/data/old.csv
+$ datapin rm abc12:/data/old.csv
 Delete /data/old.csv from project abc12? [y/N]: y
 Deleted /data/old.csv
 
-$ gosf rm abc12:/scratch/ --yes
+$ datapin rm abc12:/scratch/ --yes
 ```
 
-### `gosf projects`
+### `datapin projects`
 
 List the projects and components you can access (requires auth).
 
-### `gosf info <project>`
+### `datapin info <project>`
 
 Show project/component metadata.
 
-### `gosf open <project>[:<path>]`
+### `datapin open <project>[:<path>]`
 
 Open the project or file in your web browser.
 
-### `gosf versions <project>:<path>`
+### `datapin versions <project>:<path>`
 
 List all versions of a file, newest first.
 
 ```console
-$ gosf versions abc12:/data/counts.h5
+$ datapin versions abc12:/data/counts.h5
 VERSION  DATE                  SIZE     CONTRIBUTOR
 3        2024-03-01 09:15 UTC  14.2 MB  ada@example.com
 2        2024-02-10 14:30 UTC  13.8 MB  ada@example.com
 1        2024-01-20 08:00 UTC  12.1 MB  ada@example.com
 ```
 
-### `gosf init <project-id>`
+### `datapin init <project-id>`
 
-Create or update `.gosf/gosf.toml` in the current directory, setting the default
+Create or update `.datapin/datapin.toml` in the current directory, setting the default
 project GUID. Existing `[[files]]` entries are preserved.
 
 ```console
-$ gosf init abc12
+$ datapin init abc12
 ```
 
-### `gosf mkdir <project>:<path>`
+### `datapin mkdir <project>:<path>`
 
 Create a folder in OSF Storage (the parent folder must already exist).
 
-### `gosf mv <src> <dest>` / `gosf cp <src> <dest>`
+### `datapin mv <src> <dest>` / `datapin cp <src> <dest>`
 
 Move/rename or copy a file or folder within or across projects
 (`--conflict=keep|replace|warn`).
 
-### `gosf set <project>`
+### `datapin set <project>`
 
 Update a project's title, description, category, and/or tags (only the flags you
 pass are changed).
 
-### `gosf add <local-path> [<project>:]<remote-path>`
+### `datapin add <local-path> [<project>:]<remote-path>`
 
-Track a file (or directory, recursively) in the `.gosf/gosf.toml` manifest
-(creates the manifest if absent). `gosf pull` does the same for files it
+Track a file (or directory, recursively) in the `.datapin/datapin.toml` manifest
+(creates the manifest if absent). `datapin pull` does the same for files it
 downloads. Neither fixes which way the file will move later — that is decided per
 transfer, from the file's state. If the remote path is omitted it mirrors the
 local path.
 
 ```console
-$ gosf add results/model.pkl abc12:/results/model.pkl
-$ gosf add data/raw/ abc12:/data/raw/        # add a directory, one entry per file
-$ gosf add notes.md                          # remote mirrors the local path
+$ datapin add results/model.pkl abc12:/results/model.pkl
+$ datapin add data/raw/ abc12:/data/raw/        # add a directory, one entry per file
+$ datapin add notes.md                          # remote mirrors the local path
 ```
 
 If the file already exists on OSF its current version and MD5 are recorded in
 the manifest automatically. Files larger than 50 MB get a `.gitignore` tip.
 
-### `gosf status`
+### `datapin status`
 
-Show the sync state of every file in `.gosf/gosf.toml`.
+Show the sync state of every file in `.datapin/datapin.toml`.
 
 ```console
-$ gosf status
+$ datapin status
 STATUS    LOCAL PATH             VER   DETAIL
 ✓         data/counts.h5         v3
 AHEAD     results/model.pkl      v1    locally modified — push to publish, pull --force to discard
@@ -390,17 +474,17 @@ Flags:
 - `--no-check-remote` — skip remote version lookups (faster; cannot detect
   `BEHIND` or `REMOTE_NEWER`).
 
-### `gosf sync`
+### `datapin sync`
 
 Reconcile files with OSF according to the manifest. `sync` takes the one correct
 action for each file's state and reports the states that do not have one. It is
 non-interactive and fails hard (before transferring anything) on a diverged file.
 
 ```console
-$ gosf sync                       # reconcile everything with a clear answer
-$ gosf sync --dry-run             # preview without making changes
-$ gosf sync --force               # discard local edits, restoring from OSF
-$ gosf sync --resolve=theirs      # resolve diverged files by taking remote
+$ datapin sync                       # reconcile everything with a clear answer
+$ datapin sync --dry-run             # preview without making changes
+$ datapin sync --force               # discard local edits, restoring from OSF
+$ datapin sync --resolve=theirs      # resolve diverged files by taking remote
 ```
 
 Actions are chosen from the file's state, comparing **L**ocal, the pinned
@@ -421,8 +505,8 @@ Actions are chosen from the file's state, comparing **L**ocal, the pinned
 `AHEAD_OF_MANIFEST` is the one state `sync` will not guess at: the same
 difference means "publish this" for a generated output and "throw this away" for
 an edited input, and no hash comparison distinguishes them. Say which you meant
-with the verb — `gosf push` publishes it, `gosf pull --force` (or
-`gosf sync --force`) discards it.
+with the verb — `datapin push` publishes it, `datapin pull --force` (or
+`datapin sync --force`) discards it.
 
 Flags:
 - `--force` — discard local modifications, restoring the tracked version from
@@ -433,24 +517,24 @@ Flags:
 - `--no-check-remote` — skip remote version lookups (faster; cannot detect
   `BEHIND` or `REMOTE_NEWER`).
 
-### `gosf wiki`
+### `datapin wiki`
 
 Manage a project's wiki — the versioned markdown pages attached to it. Pages are
 addressed as `<project>:<page>`; the page name is a flat namespace (not a path),
 may contain spaces, and defaults to `home` where optional.
 
 ```console
-$ gosf wiki ls abc12                          # list pages
-$ gosf wiki get abc12 | less                  # print the home page
-$ gosf wiki get abc12:protocol protocol.md    # write a page to a file
-$ gosf wiki push docs/home.md abc12:home      # create or update a page
-$ gosf wiki versions abc12:home               # version history
-$ gosf wiki mv abc12:draft "Final Protocol"   # rename
-$ gosf wiki rm abc12:scratch --yes            # delete
-$ gosf wiki open abc12:home                   # open in the browser
+$ datapin wiki ls abc12                          # list pages
+$ datapin wiki get abc12 | less                  # print the home page
+$ datapin wiki get abc12:protocol protocol.md    # write a page to a file
+$ datapin wiki push docs/home.md abc12:home      # create or update a page
+$ datapin wiki versions abc12:home               # version history
+$ datapin wiki mv abc12:draft "Final Protocol"   # rename
+$ datapin wiki rm abc12:scratch --yes            # delete
+$ datapin wiki open abc12:home                   # open in the browser
 ```
 
-`gosf wiki push` creates the page if it does not exist, otherwise mints a new
+`datapin wiki push` creates the page if it does not exist, otherwise mints a new
 version; an identical re-push is skipped (no redundant version). The `home` page
 cannot be renamed or deleted.
 
@@ -458,24 +542,24 @@ cannot be renamed or deleted.
 and it syncs like any other file:
 
 ```console
-$ gosf wiki add docs/home.md abc12:home
-$ gosf status        # shows the wiki row alongside files
-$ gosf sync          # reconciles the page from its state, like any other entry
+$ datapin wiki add docs/home.md abc12:home
+$ datapin status        # shows the wiki row alongside files
+$ datapin sync          # reconciles the page from its state, like any other entry
 ```
 
 Wiki entries live under `[[wikis]]` in the manifest and reconcile through the
 same pinned-baseline safety model as files (`PIN_ONLY`, `REMOTE_NEWER`,
 `DIVERGED`, `--force`, `--resolve=ours|theirs`). Note that OSF normalizes wiki
 content on save (CRLF line endings become LF and surrounding whitespace is
-trimmed), so gosf compares a canonical form rather than raw bytes — a local file
+trimmed), so datapin compares a canonical form rather than raw bytes — a local file
 that differs from the wiki only in line endings or a trailing newline still counts
 as in sync, and pushing it again is a no-op.
 
-## Sync manifest (`.gosf/gosf.toml`)
+## Sync manifest (`.datapin/datapin.toml`)
 
-The manifest lives at `.gosf/gosf.toml` in your repository root (gosf walks up
-from the current directory to find it). Create it with `gosf init <project-id>`,
-or let `gosf add` / `gosf pull` create it for you. It declares which OSF files
+The manifest lives at `.datapin/datapin.toml` in your repository root (datapin walks up
+from the current directory to find it). Create it with `datapin init <project-id>`,
+or let `datapin add` / `datapin pull` create it for you. It declares which OSF files
 belong to the project:
 
 ```toml
@@ -510,13 +594,13 @@ md5     = "…"              # MD5 of the pinned version's content
 
 `[[wikis]]` entries track wiki pages the same way `[[files]]` track storage
 files (a `local` path may appear in only one of the two). The manifest is
-updated automatically when you run `gosf sync` or `gosf push` — you rarely need
+updated automatically when you run `datapin sync` or `datapin push` — you rarely need
 to edit it by hand.
 
 There is **no per-entry direction**. An entry says *what* is tracked; how it
 moves is decided per transfer from the file's state. Manifests written by
-gosf ≤ 1.9 carry a `direction` key on every entry: it is ignored with a warning
-on load and dropped the next time gosf writes the file. No migration is needed.
+datapin ≤ 1.9 carry a `direction` key on every entry: it is ignored with a warning
+on load and dropped the next time datapin writes the file. No migration is needed.
 
 ## Scripting with JSON
 
@@ -524,41 +608,41 @@ Every command accepts `--output=json`, writing structured JSON to stdout
 (progress bars are suppressed automatically):
 
 ```console
-$ gosf ls abc12:/data --output=json
+$ datapin ls abc12:/data --output=json
 [{"id":"...","attributes":{"name":"results","kind":"folder", ...}}, ...]
 
-$ gosf push data.csv abc12:/data/data.csv --output=json
+$ datapin push data.csv abc12:/data/data.csv --output=json
 {"uploaded": [{"path": "/data/data.csv", "action": "upload"}], "dry_run": false}
 
-$ gosf status --output=json
+$ datapin status --output=json
 [{"path":"data/counts.h5","kind":"file","state":"IN_SYNC","declared_version":3}]
 
-$ gosf sync --output=json
+$ datapin sync --output=json
 [{"path":"results/model.pkl","state":"AHEAD_OF_MANIFEST","declared_version":1,"action_taken":"push"}]
 
-$ gosf versions abc12:/data/counts.h5 --output=json
+$ datapin versions abc12:/data/counts.h5 --output=json
 {"versions": [{"version":3,"date_created":"2024-03-01T09:15:00","size":14900000,"contributor":"ada@example.com"}]}
 
-$ gosf add data/new.csv abc12:/data/new.csv --output=json
+$ datapin add data/new.csv abc12:/data/new.csv --output=json
 {"entries":[{"local":"data/new.csv","remote":"/data/new.csv","project":"abc12","version":0,"md5":""}],"manifest_created":false}
 
-$ gosf wiki ls abc12 --output=json
+$ datapin wiki ls abc12 --output=json
 [{"id":"...","name":"home","version":3,"size":128,"date_modified":"2024-03-01T09:15:00"}]
 
-$ gosf wiki get abc12:home --output=json
+$ datapin wiki get abc12:home --output=json
 {"project":"abc12","page":"home","version":3,"size":128,"content":"# Home\n..."}
 
-$ gosf wiki push docs/home.md abc12:home --output=json
+$ datapin wiki push docs/home.md abc12:home --output=json
 {"project":"abc12","page":"home","action":"update","version":4,"dry_run":false}
 ```
 
 The wiki commands follow the same JSON conventions: `wiki push` reports
-`"action"` ∈ `create|update|skip`, `wiki versions` matches `gosf versions`, and
+`"action"` ∈ `create|update|skip`, `wiki versions` matches `datapin versions`, and
 `wiki mv`/`wiki add` emit `{node,from,to,dry_run}` / `{entries,manifest_created}`.
-In `gosf status` / `gosf sync` output, each item carries `"kind":"file"|"wiki"`
+In `datapin status` / `datapin sync` output, each item carries `"kind":"file"|"wiki"`
 so mixed manifests are unambiguous.
 
-In JSON mode, `gosf rm` and `gosf wiki rm` require `--yes` (there is no
+In JSON mode, `datapin rm` and `datapin wiki rm` require `--yes` (there is no
 interactive prompt).
 
 ## Global flags
@@ -576,7 +660,7 @@ interactive prompt).
 
 ## Logging and output streams
 
-`gosf` writes **results to stdout and activity to stderr**, so the two compose
+`datapin` writes **results to stdout and activity to stderr**, so the two compose
 cleanly:
 
 - **stdout** — the machine/result surface: `ls`/`status`/`versions`/`projects`
@@ -592,12 +676,12 @@ stdout stays pure JSON and activity logging is silenced unless you pass `-v`.
 
 ## Exit codes
 
-`gosf` exits non-zero on any error, so it composes cleanly in scripts and CI.
+`datapin` exits non-zero on any error, so it composes cleanly in scripts and CI.
 
 ## Development
 
 ```console
-go build -o gosf .     # build
+go build -o datapin .     # build
 go test ./...          # run tests
 go test -race ./...    # run tests with the race detector
 go vet ./...           # static checks

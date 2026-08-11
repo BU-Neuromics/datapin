@@ -27,7 +27,7 @@ import (
 	"time"
 )
 
-// binaryPath is the gosf binary built once in TestMain and shared across tests.
+// binaryPath is the datapin binary built once in TestMain and shared across tests.
 var binaryPath string
 
 func TestMain(m *testing.M) {
@@ -55,13 +55,13 @@ func buildBinary() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	tmp, err := os.MkdirTemp("", "gosf-live-*")
+	tmp, err := os.MkdirTemp("", "datapin-live-*")
 	if err != nil {
 		return "", err
 	}
-	bin := filepath.Join(tmp, "gosf")
+	bin := filepath.Join(tmp, "datapin")
 	buildArgs := []string{"build", "-o", bin, "."}
-	if os.Getenv("GOSF_COVERDIR") != "" {
+	if os.Getenv("DATAPIN_COVERDIR") != "" {
 		buildArgs = []string{"build", "-cover", "-o", bin, "."}
 	}
 	cmd := exec.Command("go", buildArgs...)
@@ -72,7 +72,7 @@ func buildBinary() (string, error) {
 	return bin, nil
 }
 
-// liveEnv runs the real gosf binary against real OSF using the test PAT, in an
+// liveEnv runs the real datapin binary against real OSF using the test PAT, in an
 // isolated HOME so it never reads or writes the developer's config/keychain.
 type liveEnv struct {
 	t         *testing.T
@@ -108,7 +108,7 @@ func (e *liveEnv) requireComponent() string {
 	return e.component
 }
 
-// run executes gosf with args in the test working dir against live OSF.
+// run executes datapin with args in the test working dir against live OSF.
 func (e *liveEnv) run(args ...string) (stdout, stderr string, code int) {
 	e.t.Helper()
 	cmd := exec.Command(binaryPath, args...)
@@ -119,10 +119,10 @@ func (e *liveEnv) run(args ...string) (stdout, stderr string, code int) {
 		"HOME="+e.dir,
 		"XDG_CONFIG_HOME="+filepath.Join(e.dir, ".config"),
 		// Guard against a leaked fake-server override: empty → live api.osf.io.
-		"GOSF_API_BASE=",
-		"GOSF_FILES_BASE=",
+		"DATAPIN_API_BASE=",
+		"DATAPIN_FILES_BASE=",
 	)
-	if dir := os.Getenv("GOSF_COVERDIR"); dir != "" {
+	if dir := os.Getenv("DATAPIN_COVERDIR"); dir != "" {
 		cmd.Env = append(cmd.Env, "GOCOVERDIR="+dir)
 	}
 	var outBuf, errBuf bytes.Buffer
@@ -142,7 +142,7 @@ func (e *liveEnv) run(args ...string) (stdout, stderr string, code int) {
 // registers cleanup that deletes it (best effort) after the test.
 func (e *liveEnv) mkTempRemoteDir(node string) string {
 	e.t.Helper()
-	dir := fmt.Sprintf("/gosf-ci-%d-%d", time.Now().UnixNano(), os.Getpid())
+	dir := fmt.Sprintf("/datapin-ci-%d-%d", time.Now().UnixNano(), os.Getpid())
 	if _, stderr, code := e.runEventually("mkdir", node+":"+dir, "--quiet"); code != 0 {
 		e.t.Fatalf("mkdir %s:%s failed: %s", node, dir, stderr)
 	}
@@ -152,7 +152,7 @@ func (e *liveEnv) mkTempRemoteDir(node string) string {
 	return dir
 }
 
-// runEventually retries a gosf command until it exits 0 (or a cap is hit),
+// runEventually retries a datapin command until it exits 0 (or a cap is hit),
 // tolerating OSF's eventual consistency: reads through the metadata API
 // (api.osf.io) can transiently 404 for a short window after a Waterbutler write
 // (files.osf.io), and the inconsistency is non-monotonic (a read may succeed,

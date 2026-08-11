@@ -3,7 +3,7 @@ package manifest_test
 import (
 	"testing"
 
-	"github.com/BU-Neuromics/gosf/internal/manifest"
+	"github.com/BU-Neuromics/datapin/internal/manifest"
 )
 
 // makeEntry builds a minimal Entry for testing ClassifyFile. There is no

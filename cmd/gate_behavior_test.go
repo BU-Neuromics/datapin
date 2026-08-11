@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/BU-Neuromics/gosf/internal/manifest"
+	"github.com/BU-Neuromics/datapin/internal/manifest"
 )
 
 // These paths return before any network client is dereferenced, so nil clients
@@ -90,7 +90,7 @@ func TestDivergenceError_SuggestsResolutionsThatWork(t *testing.T) {
 	versions := []manifest.RemoteVersion{{Version: 2, MD5: "R"}, {Version: 1, MD5: "B"}}
 	msg := divergenceError(entry, "abc12", "L", versions).Error()
 
-	for _, want := range []string{"gosf sync --resolve=theirs", "gosf sync --resolve=ours"} {
+	for _, want := range []string{"datapin sync --resolve=theirs", "datapin sync --resolve=ours"} {
 		if !strings.Contains(msg, want) {
 			t.Errorf("divergence message should suggest %q:\n%s", want, msg)
 		}

@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
-	"github.com/BU-Neuromics/gosf/internal/manifest"
-	"github.com/BU-Neuromics/gosf/internal/resolver"
+	"github.com/BU-Neuromics/datapin/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/manifest"
+	"github.com/BU-Neuromics/datapin/internal/resolver"
 )
 
 func mkfile(name string) client.FileItem {
@@ -243,7 +243,7 @@ func TestLatestRemoteVersion(t *testing.T) {
 	}
 }
 
-// An explicit `gosf push <src> <project>:<path>` is no longer refused because
+// An explicit `datapin push <src> <project>:<path>` is no longer refused because
 // of anything recorded on the tracked entry: the verb is the intent, and the
 // state gates decide the rest (issue #81).
 func TestPushNotRefusedForTrackedEntry(t *testing.T) {

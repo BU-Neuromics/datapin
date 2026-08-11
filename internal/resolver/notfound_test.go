@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
-	"github.com/BU-Neuromics/gosf/internal/resolver"
+	"github.com/BU-Neuromics/datapin/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/resolver"
 )
 
 // A path that genuinely is not on the remote must be distinguishable from a

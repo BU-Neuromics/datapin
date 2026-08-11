@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/client"
 )
 
 // Target holds the parsed components of an OSF path argument like
@@ -166,7 +166,7 @@ func findItem(items []client.FileItem, name string) (client.FileItem, bool) {
 // The distinction is load-bearing. A scan treats "not found" as "nothing on the
 // remote to compare", which for an unpinned entry classifies NOT_PUSHED and
 // makes sync upload it. If a throttled or failed request were folded into the
-// same category, a transient 429 would cause gosf to re-upload files that were
+// same category, a transient 429 would cause datapin to re-upload files that were
 // already on the remote, byte-identical (issue #86).
 type NotFoundError struct {
 	Path string

@@ -93,8 +93,8 @@ func TestOnboard_PTY_EndToEnd(t *testing.T) {
 	cmd := exec.Command(binaryPath, "onboard")
 	cmd.Dir = env.dir
 	cmd.Env = append(os.Environ(),
-		"GOSF_API_BASE="+env.srv.URL()+"/v2",
-		"GOSF_FILES_BASE="+env.srv.URL(),
+		"DATAPIN_API_BASE="+env.srv.URL()+"/v2",
+		"DATAPIN_FILES_BASE="+env.srv.URL(),
 		"OSF_TOKEN=test-token", // skips the auth prompt
 		"HOME="+env.dir,
 		"XDG_CONFIG_HOME="+filepath.Join(env.dir, ".config"),
@@ -135,7 +135,7 @@ func TestOnboard_PTY_EndToEnd(t *testing.T) {
 	}
 
 	// The manifest gained push entries for both files.
-	toml := env.readFile(".gosf/gosf.toml")
+	toml := env.readFile(".datapin/datapin.toml")
 	for _, want := range []string{"data.csv", "notes/todo.txt"} {
 		if !strings.Contains(toml, want) {
 			t.Errorf("manifest missing %q:\n%s", want, toml)

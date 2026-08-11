@@ -7,11 +7,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
-	"github.com/BU-Neuromics/gosf/internal/config"
-	"github.com/BU-Neuromics/gosf/internal/log"
-	"github.com/BU-Neuromics/gosf/internal/output"
-	"github.com/BU-Neuromics/gosf/internal/resolver"
+	"github.com/BU-Neuromics/datapin/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/config"
+	"github.com/BU-Neuromics/datapin/internal/log"
+	"github.com/BU-Neuromics/datapin/internal/output"
+	"github.com/BU-Neuromics/datapin/internal/resolver"
 )
 
 var (
@@ -34,10 +34,10 @@ file is moved to the destination folder (and optionally renamed).
   keep    — upload as a new name (dest_1.ext, dest_2.ext, …)
 
 Examples:
-  gosf mv abc12:/raw/counts.h5 abc12:/raw/counts_v2.h5
-  gosf mv abc12:/raw/counts.h5 abc12:/processed/counts.h5
-  gosf mv abc12:/raw/counts.h5 xyz34:/archive/counts.h5
-  gosf mv abc12:/data/file.csv abc12:/results/output.csv --conflict replace`,
+  datapin mv abc12:/raw/counts.h5 abc12:/raw/counts_v2.h5
+  datapin mv abc12:/raw/counts.h5 abc12:/processed/counts.h5
+  datapin mv abc12:/raw/counts.h5 xyz34:/archive/counts.h5
+  datapin mv abc12:/data/file.csv abc12:/results/output.csv --conflict replace`,
 	Args:         cobra.ExactArgs(2),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -58,7 +58,7 @@ Examples:
 
 		token := config.LoadToken(flagToken)
 		if token == "" {
-			return fmt.Errorf("mv requires authentication — run 'gosf auth login' or set OSF_TOKEN")
+			return fmt.Errorf("mv requires authentication — run 'datapin auth login' or set OSF_TOKEN")
 		}
 
 		srcStr := args[0]

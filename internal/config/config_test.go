@@ -207,7 +207,7 @@ func TestDeleteToken_NoFileIsOK(t *testing.T) {
 // TestDeleteToken_WarnsButSucceedsOnKeychainError verifies that a keychain
 // failure (e.g. a locked keychain on headless/HPC) is a non-fatal warning: the
 // token file is still removed and logout succeeds. This is what keeps
-// `gosf auth logout` working where the keychain is unavailable.
+// `datapin auth logout` working where the keychain is unavailable.
 func TestDeleteToken_WarnsButSucceedsOnKeychainError(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("OSF_TOKEN", "")

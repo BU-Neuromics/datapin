@@ -1,0 +1,1 @@
+{"status": 400, "message": "A validation error occurred.", "errors": [{"field": "metadata.publisher", "messages": ["Missing publisher field required for DOI registration."]}]}

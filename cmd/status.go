@@ -8,12 +8,12 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/BU-Neuromics/gosf/internal/client"
-	"github.com/BU-Neuromics/gosf/internal/config"
-	"github.com/BU-Neuromics/gosf/internal/log"
-	"github.com/BU-Neuromics/gosf/internal/manifest"
-	"github.com/BU-Neuromics/gosf/internal/output"
-	"github.com/BU-Neuromics/gosf/internal/resolver"
+	"github.com/BU-Neuromics/datapin/internal/client"
+	"github.com/BU-Neuromics/datapin/internal/config"
+	"github.com/BU-Neuromics/datapin/internal/log"
+	"github.com/BU-Neuromics/datapin/internal/manifest"
+	"github.com/BU-Neuromics/datapin/internal/output"
+	"github.com/BU-Neuromics/datapin/internal/resolver"
 )
 
 var (
@@ -28,7 +28,7 @@ var statusCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		manifestPath, repoRoot, err := manifest.FindManifest()
 		if manifest.IsNotFound(err) {
-			return fmt.Errorf("no .gosf/gosf.toml found — run 'gosf init <project-id>' to start tracking this repo, then 'gosf add' / 'gosf pull' to register files")
+			return fmt.Errorf("no .datapin/datapin.toml found — run 'datapin init <project-id>' to start tracking this repo, then 'datapin add' / 'datapin pull' to register files")
 		}
 		if err != nil {
 			return err
@@ -159,6 +159,32 @@ var statusCmd = &cobra.Command{
 						{Text: detail, Style: output.Dim},
 					})
 				}
+			}
+		}
+
+		// Classify datasets against their archive remotes (dataset-level
+		// rows: one publishable record = one row).
+		for i := range m.Datasets {
+			ds := &m.Datasets[i]
+			state, detail, err := datasetStatus(cmd.Context(), m, repoRoot, ds, statusNoCheckRemote)
+			if err != nil {
+				return err
+			}
+			if state != "IN_SYNC" {
+				allInSync = false
+			}
+			if jsonMode {
+				jsonItems = append(jsonItems, output.StatusItem{
+					Path: ds.Slug, Kind: "dataset", State: state,
+					DeclaredVersion: ds.Version,
+				})
+			} else {
+				rows = append(rows, []output.Cell{
+					{Text: datasetStateGlyph(state), Style: datasetStateStyle(state)},
+					{Text: ds.Slug},
+					{Text: verLabel(ds.Version)},
+					{Text: detail, Style: output.Dim},
+				})
 			}
 		}
 

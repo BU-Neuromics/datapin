@@ -1,0 +1,2 @@
+POST https://sandbox.zenodo.org/api/records
+{"metadata":{"title":"datapin phase-0 multipart","publication_date":"2026-08-10","publisher":"Zenodo","creators":[{"person_or_org":{"type":"personal","family_name":"Labadorf","given_name":"Adam"}}],"resource_type":{"id":"dataset"}},"files":{"enabled":true}}

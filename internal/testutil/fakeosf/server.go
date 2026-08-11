@@ -181,7 +181,7 @@ func New() *Server {
 	return s
 }
 
-// URL returns the server base URL, used for both GOSF_API_BASE and GOSF_FILES_BASE.
+// URL returns the server base URL, used for both DATAPIN_API_BASE and DATAPIN_FILES_BASE.
 func (s *Server) URL() string { return s.srv.URL }
 
 // Close shuts the server down.
@@ -301,7 +301,7 @@ func (s *Server) VersionsRequests() int {
 
 // ListRequests returns how many file-listing *pages* the server has served.
 // Because the fake paginates like real OSF (default 10 per page, capped at
-// 100), this is what proves gosf asks for a large page size instead of walking
+// 100), this is what proves datapin asks for a large page size instead of walking
 // a folder ten items at a time (issue #86).
 func (s *Server) ListRequests() int {
 	s.mu.Lock()
@@ -592,7 +592,7 @@ func (s *Server) handleFileList(w http.ResponseWriter, r *http.Request) {
 
 // defaultPageSize and maxServedPageSize mirror real OSF: an unqualified request
 // gets 10 items, and page[size] is honoured up to 100 and silently capped
-// beyond it. gosf's fake used to return everything in one page with next=nil,
+// beyond it. datapin's fake used to return everything in one page with next=nil,
 // so no test ever exercised the multi-page walk.
 const (
 	defaultPageSize   = 10
