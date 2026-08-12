@@ -4,3 +4,13 @@ coverage/
 
 # Serena MCP local project cache
 .serena/
+
+# Agent-local state, not project source: skill installs (npx skills add),
+# agent worktrees, and scheduler locks. The skill SOURCE of truth is
+# skills/datapin/SKILL.md, guarded by cmd/skill_doc_test.go — installed
+# copies must never be committed or they become a second, untested copy.
+.agents/
+.claude/skills/
+.claude/worktrees/
+.claude/scheduled_tasks.lock
+skills-lock.json
