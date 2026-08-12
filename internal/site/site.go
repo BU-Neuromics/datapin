@@ -61,6 +61,14 @@ type navItem struct {
 	Href  string
 }
 
+// renderedPage is one markdown page after conversion, held so the nav can
+// be built from real titles before any page is written.
+type renderedPage struct {
+	Slug  string
+	Title string
+	Body  template.HTML
+}
+
 // Build renders the whole site.
 func Build(in BuildInput) (Site, error) {
 	m := in.Manifest
@@ -69,12 +77,31 @@ func Build(in BuildInput) (Site, error) {
 		title = "datapin project"
 	}
 
-	n := nav{SiteTitle: title}
+	// Render every markdown page up front: the nav labels pages by their
+	// title, so no page can be rendered until all titles are known.
+	pages := make([]renderedPage, 0, len(m.Site.Pages))
 	for _, p := range m.Site.Pages {
+		src, ok := in.PageSources[p.Local]
+		if !ok {
+			return Site{}, fmt.Errorf("site page %s: no source content", p.Local)
+		}
+		fmTitle, body, err := renderMarkdown(src)
+		if err != nil {
+			return Site{}, fmt.Errorf("rendering %s: %w", p.Local, err)
+		}
+		pageTitle := fmTitle
+		if pageTitle == "" {
+			pageTitle = p.Slug
+		}
+		pages = append(pages, renderedPage{Slug: p.Slug, Title: pageTitle, Body: body})
+	}
+
+	n := nav{SiteTitle: title}
+	for _, p := range pages {
 		if p.Slug == "index" {
 			continue
 		}
-		n.Pages = append(n.Pages, navItem{Title: p.Slug, Href: relRoot(p.Slug) + "/"})
+		n.Pages = append(n.Pages, navItem{Title: p.Title, Href: relRoot(p.Slug) + "/"})
 	}
 	for _, ds := range m.Datasets {
 		dsTitle := ds.Metadata.Title
@@ -89,26 +116,14 @@ func Build(in BuildInput) (Site, error) {
 	// Markdown pages.
 	var indexBody template.HTML
 	indexTitle := ""
-	for _, p := range m.Site.Pages {
-		src, ok := in.PageSources[p.Local]
-		if !ok {
-			return Site{}, fmt.Errorf("site page %s: no source content", p.Local)
-		}
-		fmTitle, body, err := renderMarkdown(src)
-		if err != nil {
-			return Site{}, fmt.Errorf("rendering %s: %w", p.Local, err)
-		}
-		pageTitle := fmTitle
-		if pageTitle == "" {
-			pageTitle = p.Slug
-		}
+	for _, p := range pages {
 		if p.Slug == "index" {
-			indexBody, indexTitle = body, pageTitle
+			indexBody, indexTitle = p.Body, p.Title
 			continue
 		}
 		html, err := renderPage(pageData{
-			Nav: n, Title: pageTitle, TabTitle: pageTitle + " — " + title,
-			Body: body, Depth: 1,
+			Nav: n, Title: p.Title, TabTitle: p.Title + " — " + title,
+			Body: p.Body, Depth: 1,
 		})
 		if err != nil {
 			return Site{}, err
@@ -159,6 +174,10 @@ func Build(in BuildInput) (Site, error) {
 func renderMarkdown(src []byte) (title string, body template.HTML, err error) {
 	md := goldmark.New(
 		goldmark.WithExtensions(extension.GFM, &frontmatter.Extender{}),
+		// Without ids on headings no in-page anchor resolves — a page
+		// carrying its own table of contents would link nowhere, and so
+		// would every cross-page link to a named section.
+		goldmark.WithParserOptions(parser.WithAutoHeadingID()),
 	)
 	var buf bytes.Buffer
 	ctx := parser.NewContext()

@@ -30,7 +30,7 @@ it only has value while OSF's API is still up.
 | v0.3.0 | Correctness + live verification — **on dev now** | License policy D37 (explicit license at publish), `contact_email` (D38), Dataverse live-verified end to end (D37–D42, six divergences fixed), live CI tiers for Zenodo/Dataverse/workspace protocols + CLI E2E, pull pin-integrity gate |
 | v0.4.0 | The OSF exit | `datapin migrate` (#30), skills.sh re-registration (#26), #28 sign-off |
 | v0.5.0 | First-run experience + robustness | `onboard` rewrite around publish (#25), invenio multipart uploads (#19), per-instance InvenioRDM Caps probing (#20) |
-| v1.0 | Declare it | Docs pass, fresh-eyes walkthrough, live suites green for weeks — see #40 |
+| v1.0 | Declare it | Docs pass, **published docs site + task guides + troubleshooting + `CITATION.cff` (#54)**, fresh-eyes walkthrough, live suites green for weeks — see #40 |
 | v2.0 | After the OSF shutdown | Remove the OSF surface, `migrate`, and gosf back-compat (#31) |
 
 Not gating v1.0 (demand-driven): Figshare live verification (#14), Dryad

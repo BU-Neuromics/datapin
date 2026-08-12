@@ -14,7 +14,7 @@ export
 
 COVDIR := coverage
 
-.PHONY: help build test integration live live-repro fmt vet check cover
+.PHONY: help build test integration live live-repro fmt vet check cover man site
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -22,6 +22,12 @@ help: ## List available targets
 
 build: ## Build the datapin binary
 	$(GO) build -o datapin .
+
+man: build ## Generate man/datapin.1 from the live command tree
+	./datapin man --out man/datapin.1
+
+site: build ## Build datapin's own documentation site into public/
+	./datapin site build
 
 test: ## Unit tests (race detector)
 	$(GO) test -race ./...

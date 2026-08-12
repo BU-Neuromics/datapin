@@ -77,20 +77,82 @@ func TestEnablePages(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	if err := site.EnablePages(context.Background(), srv.URL, "org/repo", "tok"); err != nil {
+	st, err := site.EnablePages(context.Background(), srv.URL, "org/repo", "tok")
+	if err != nil {
 		t.Fatalf("EnablePages: %v", err)
 	}
 	if method != "POST" || path != "/repos/org/repo/pages" || auth != "Bearer tok" {
 		t.Errorf("request = %s %s auth=%q", method, path, auth)
 	}
+	if !st.Created || !st.ServingSite() {
+		t.Errorf("a fresh 201 must report Created and a gh-pages source: %+v", st)
+	}
 
-	status = 409 // already enabled — success
-	if err := site.EnablePages(context.Background(), srv.URL, "org/repo", "tok"); err != nil {
+	status = 409 // already enabled — not an error
+	if _, err := site.EnablePages(context.Background(), srv.URL, "org/repo", "tok"); err != nil {
 		t.Errorf("409 must be treated as already-enabled: %v", err)
 	}
 
 	status = 404
-	if err := site.EnablePages(context.Background(), srv.URL, "org/repo", "tok"); err == nil {
+	if _, err := site.EnablePages(context.Background(), srv.URL, "org/repo", "tok"); err == nil {
 		t.Error("404 must surface as an error")
+	}
+}
+
+// A repo whose Pages is already switched on, but pointed somewhere other
+// than gh-pages, is the trap: the deploy succeeds, the POST 409s, and the
+// site silently keeps serving the old source. EnablePages must read the
+// existing config back and report it so the caller can say so out loud.
+func TestEnablePages_AlreadyEnabledOnAnotherSource(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" {
+			w.WriteHeader(http.StatusConflict)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"html_url":"https://org.github.io/repo/",
+			"source":{"branch":"main","path":"/"}}`))
+	}))
+	defer srv.Close()
+
+	st, err := site.EnablePages(context.Background(), srv.URL, "org/repo", "tok")
+	if err != nil {
+		t.Fatalf("EnablePages: %v", err)
+	}
+	if st.Created {
+		t.Error("Created must be false when Pages was already configured")
+	}
+	if st.Branch != "main" || st.Path != "/" {
+		t.Errorf("existing source not reported: %+v", st)
+	}
+	if st.ServingSite() {
+		t.Error("a main/ source is not serving what DeployGHPages pushed")
+	}
+	if st.URL != "https://org.github.io/repo/" {
+		t.Errorf("URL = %q, want the html_url from the API", st.URL)
+	}
+}
+
+// The read-back is best-effort: a 409 whose follow-up GET fails must still
+// not fail the publish — the bytes are already on gh-pages.
+func TestEnablePages_ConflictWithUnreadableConfig(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" {
+			w.WriteHeader(http.StatusConflict)
+			return
+		}
+		w.WriteHeader(http.StatusForbidden)
+	}))
+	defer srv.Close()
+
+	st, err := site.EnablePages(context.Background(), srv.URL, "org/repo", "tok")
+	if err != nil {
+		t.Fatalf("a 409 with an unreadable config must not fail the publish: %v", err)
+	}
+	if st.Created || st.Branch != "" {
+		t.Errorf("unknown source should stay unknown: %+v", st)
+	}
+	if st.ServingSite() {
+		t.Error("an unknown source must not claim to be serving the site")
 	}
 }

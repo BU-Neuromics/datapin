@@ -273,7 +273,20 @@ datapin site publish [--github-token <tok>] [--out <dir>]      # build + push to
 
 `site publish` finds a GitHub token via `--github-token` → `GITHUB_TOKEN` →
 `GH_TOKEN` → `gh auth token`; without one the push uses the git credential
-helper and the first-run Pages toggle is skipped with a note.
+helper and the first-run Pages toggle is skipped with a note. Pages must serve
+the **`gh-pages` branch at the root**: if it is already switched on for another
+source, the push succeeds but the site keeps serving the old source, and
+`site publish` warns saying so.
+
+### Man page
+
+```bash
+datapin man                          # roff man page on stdout
+datapin man --out man/datapin.1      # write to a file (--date for reproducible builds)
+```
+
+Generated from the live cobra tree, so it cannot drift from the CLI. Install it
+with `datapin man > /usr/local/share/man/man1/datapin.1`.
 
 ## Workspace remotes (cluster→laptop intermediate results)
 

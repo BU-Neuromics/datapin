@@ -3,6 +3,10 @@
 [![CI](https://github.com/BU-Neuromics/datapin/actions/workflows/ci.yml/badge.svg)](https://github.com/BU-Neuromics/datapin/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/BU-Neuromics/datapin)](https://github.com/BU-Neuromics/datapin/releases)
 
+📖 **[Documentation and guides →](https://bu-neuromics.github.io/datapin/)** —
+task-shaped walkthroughs and a troubleshooting reference. (That site is built by
+`datapin site publish` from this repository's own manifest.)
+
 **Pin, sync, and publish research data.** `datapin` is a fast, single-binary
 CLI that publishes your data to a FAIR archive with a DOI — and, before it is
 ready for that, keeps it moving between the cluster and your laptop. Both
@@ -126,6 +130,66 @@ go install github.com/BU-Neuromics/datapin@latest
 git clone https://github.com/BU-Neuromics/datapin
 cd datapin
 go build -o datapin .
+```
+
+### Shell completion
+
+`datapin completion <shell>` prints a completion script for `bash`, `zsh`,
+`fish`, or `powershell` — it completes subcommands, flags, and remote names.
+
+```console
+# bash — current shell, then permanently
+$ source <(datapin completion bash)
+$ datapin completion bash | sudo tee /etc/bash_completion.d/datapin >/dev/null
+
+# zsh (ensure `autoload -U compinit && compinit` runs in your .zshrc)
+$ datapin completion zsh > "${fpath[1]}/_datapin"
+
+# fish
+$ datapin completion fish > ~/.config/fish/completions/datapin.fish
+```
+
+Run `datapin completion --help` for your shell's exact install path.
+
+### Man page
+
+A single binary has nowhere to ship a man page from, so datapin generates its
+own from the live command tree — it cannot drift from the CLI.
+
+```console
+$ datapin man | less                                          # read it now
+$ datapin man > /usr/local/share/man/man1/datapin.1           # install it
+$ datapin man --out man/datapin.1 --date 2026-08-12           # reproducible build
+$ man datapin
+```
+
+### Uninstalling
+
+datapin is one binary plus a config directory. Remove the binary from wherever
+you installed it (`which datapin` to find it — typically `/usr/local/bin`,
+`~/.local/bin`, or `%LOCALAPPDATA%\Programs\datapin`), then:
+
+```console
+$ rm -rf ~/.config/datapin        # remotes, tokens, update-check cache
+```
+
+Windows: `%APPDATA%\datapin`. If you stored tokens in the OS keychain rather
+than a file, run `datapin remote rm <name>` for each remote **before** deleting
+the binary — that deletes the keychain entry too. `datapin auth logout` does the
+same for the legacy OSF token. Your `.datapin/datapin.toml` manifests are
+project files and are left alone; nothing else is written outside these paths.
+
+### The update check
+
+After each command, datapin prints a one-line "new release available" notice to
+stderr when your build is behind the latest GitHub release. It is best-effort
+and cached — at most one API call per day, short timeout, never blocking.
+
+It is already suppressed under `--quiet`, `--output=json`, a non-TTY stderr, a
+`dev` build, and an interrupted run. To turn it off entirely:
+
+```console
+$ export DATAPIN_NO_UPDATE_CHECK=1
 ```
 
 ## The manifest (`.datapin/datapin.toml`)
@@ -797,13 +861,46 @@ names every command and flag the CLI actually has.
 
 ## Documentation
 
-- [`ROADMAP.md`](./ROADMAP.md) — shipped releases and the ladder to v1.0
+### For users
+
+The [documentation site](https://bu-neuromics.github.io/datapin/) — generated
+from this repository by `datapin site publish` — holds the task-shaped material.
+This README is the command reference.
+
+- [**Your first DOI**](https://bu-neuromics.github.io/datapin/first-doi/) —
+  a results folder to a resolving DOI and a citation, rehearsed on a sandbox
+- [**Publishing a new version**](https://bu-neuromics.github.io/datapin/new-version/)
+  — what re-pins, what the concept DOI is for, when `--force` applies
+- [**Cluster to laptop**](https://bu-neuromics.github.io/datapin/workspace/) —
+  workspace remotes, credentials per kind, `revert` and `gc`
+- [**Leaving OSF**](https://bu-neuromics.github.io/datapin/leaving-osf/) —
+  both `migrate` modes and what to review before publishing
+- [**Institutional repositories**](https://bu-neuromics.github.io/datapin/institutional/)
+  — InvenioRDM and Dataverse: probing, `contact_email`, license vocabularies
+- [**Scripting and CI**](https://bu-neuromics.github.io/datapin/automation/) —
+  `--output=json`, `--yes`, exit codes, the token ladders
+- [**Troubleshooting**](https://bu-neuromics.github.io/datapin/troubleshooting/)
+  — every error datapin raises on purpose, and the command that resolves it
 - [`CHANGELOG.md`](./CHANGELOG.md) — what changed, per release
+
+The guide sources live under [`docs/`](./docs/) and are listed in
+[`.datapin/datapin.toml`](./.datapin/datapin.toml), so a fix is a pull request
+against a markdown file.
+
+### For contributors and project history
+
+- [`ROADMAP.md`](./ROADMAP.md) — shipped releases and the ladder to v1.0
 - [`docs/reboot-plan.md`](./docs/reboot-plan.md) — architecture and phases
 - [`docs/decisions.md`](./docs/decisions.md) — every implementation decision, with rationale
 - [`docs/zenodo-notes.md`](./docs/zenodo-notes.md) — verified Zenodo/InvenioRDM API behaviors
 - [`docs/osf-api.md`](./docs/osf-api.md) — OSF REST/Waterbutler notes
+- [`CONTRIBUTING.md`](./CONTRIBUTING.md) — how to propose a change
 - [`CLAUDE.md`](./CLAUDE.md) — the development guide
+
+## Citing datapin
+
+If datapin helped produce data you published, please cite it — GitHub renders a
+**Cite this repository** button from [`CITATION.cff`](./CITATION.cff).
 
 ## Development
 

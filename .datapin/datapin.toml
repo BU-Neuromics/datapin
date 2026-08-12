@@ -1,0 +1,52 @@
+schema = 2
+
+# datapin's own documentation site, built by `datapin site build` and
+# deployed by `datapin site publish` — the tool dogfooding its own site
+# generator (issue #54). There are no [[datasets]] here: this manifest
+# exists for the [site] section alone.
+#
+# Page order below is the nav order. Each page is published at /<slug>/,
+# so cross-links between pages are written as ../<slug>/.
+
+[project]
+id = ""
+
+[site]
+title    = "datapin"
+base_url = "https://bu-neuromics.github.io/datapin"
+repo     = "BU-Neuromics/datapin"
+deploy   = "gh-pages"
+
+# The landing page. The slug "index" is special: it becomes the site root.
+[[site.pages]]
+local = "docs/index.md"
+slug  = "index"
+
+# Task-shaped guides, in the order a user meets them.
+[[site.pages]]
+local = "docs/guides/first-doi.md"
+slug  = "first-doi"
+
+[[site.pages]]
+local = "docs/guides/new-version.md"
+slug  = "new-version"
+
+[[site.pages]]
+local = "docs/guides/workspace.md"
+slug  = "workspace"
+
+[[site.pages]]
+local = "docs/guides/leaving-osf.md"
+slug  = "leaving-osf"
+
+[[site.pages]]
+local = "docs/guides/institutional.md"
+slug  = "institutional"
+
+[[site.pages]]
+local = "docs/guides/automation.md"
+slug  = "automation"
+
+[[site.pages]]
+local = "docs/troubleshooting.md"
+slug  = "troubleshooting"
