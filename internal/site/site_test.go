@@ -155,6 +155,29 @@ func TestBuild_IndexCatalogAndSitemap(t *testing.T) {
 	}
 }
 
+// Headings must carry ids, or no in-page anchor works: a page with its own
+// table of contents (the troubleshooting reference) would link nowhere, and
+// so would every cross-page link to a specific section.
+func TestBuild_HeadingsGetAnchorIDs(t *testing.T) {
+	in := buildInput()
+	in.PageSources["docs/methods.md"] = []byte(
+		"# Methods\n\n## Publish refuses: a license is required\n\ntext\n\n## Step two\n\nmore\n")
+
+	out, err := site.Build(in)
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	html := string(out.Files["methods/index.html"])
+	for _, want := range []string{
+		`id="publish-refuses-a-license-is-required"`,
+		`id="step-two"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Errorf("missing heading anchor %s in:\n%s", want, html)
+		}
+	}
+}
+
 func TestBuild_UnsafeHTMLEscaped(t *testing.T) {
 	in := buildInput()
 	in.PageSources["docs/index.md"] = []byte("# Hi\n\n<script>alert(1)</script>")
@@ -165,6 +188,44 @@ func TestBuild_UnsafeHTMLEscaped(t *testing.T) {
 	if strings.Contains(string(out.Files["index.html"]), "<script>alert(1)</script>") {
 		t.Error("raw HTML in markdown must not pass through unescaped")
 	}
+}
+
+// The nav must name pages the way a reader does — a slug like "first-doi"
+// is a URL component, not a link label. Frontmatter title wins; the slug is
+// only the fallback for a page that declares none.
+func TestBuild_NavUsesPageTitles(t *testing.T) {
+	in := buildInput()
+	in.Manifest.Site.Pages = append(in.Manifest.Site.Pages,
+		manifest.SitePage{Local: "docs/first-doi.md", Slug: "first-doi"})
+	in.PageSources["docs/first-doi.md"] = []byte("---\ntitle: Your first DOI\n---\n\n# Your first DOI\n\nGo.")
+
+	out, err := site.Build(in)
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	for _, page := range []string{"methods/index.html", "first-doi/index.html", "index.html"} {
+		html := string(out.Files[page])
+		if !strings.Contains(html, `>Your first DOI</a>`) {
+			t.Errorf("%s: nav must label the page with its title, not its slug:\n%s", page, navOf(html))
+		}
+		if strings.Contains(navOf(html), `>first-doi</a>`) {
+			t.Errorf("%s: nav still shows the raw slug:\n%s", page, navOf(html))
+		}
+	}
+
+	// A page with no frontmatter title keeps falling back to its slug.
+	if !strings.Contains(navOf(string(out.Files["index.html"])), `>methods</a>`) {
+		t.Error("a page without a frontmatter title should fall back to its slug in the nav")
+	}
+}
+
+func navOf(html string) string {
+	if _, rest, ok := strings.Cut(html, "<nav>"); ok {
+		if inner, _, ok := strings.Cut(rest, "</nav>"); ok {
+			return inner
+		}
+	}
+	return html
 }
 
 func TestBuild_FrontmatterTitleWins(t *testing.T) {

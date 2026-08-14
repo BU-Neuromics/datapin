@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -78,36 +79,93 @@ func DeployGHPages(ctx context.Context, dir, remoteURL, token string) error {
 	return run(pushArgs...)
 }
 
+// deployBranch is the branch DeployGHPages force-pushes to, and the only
+// source a Pages site can have if it is to serve what we published.
+const deployBranch = "gh-pages"
+
+// PagesStatus is what GitHub Pages is configured to serve after a call to
+// EnablePages. Branch/Path are empty when the existing configuration could
+// not be read (a 409 whose follow-up GET failed).
+type PagesStatus struct {
+	Created bool   // Pages was switched on by this call
+	Branch  string // source branch, e.g. "gh-pages"
+	Path    string // source path, e.g. "/"
+	URL     string // the site's html_url, when the API reported one
+}
+
+// ServingSite reports whether the configured source is the branch and path
+// DeployGHPages writes to. When it is false, the publish put the site on
+// gh-pages but Pages is serving something else — the caller must say so.
+func (s PagesStatus) ServingSite() bool {
+	return s.Branch == deployBranch && s.Path == "/"
+}
+
 // EnablePages turns on GitHub Pages for repo ("owner/name"), serving the
 // gh-pages branch, via the REST API (first deploy only — the user never
-// opens the settings UI). A 409 means Pages is already configured.
-func EnablePages(ctx context.Context, apiBase, repo, token string) error {
+// opens the settings UI).
+//
+// A 409 means Pages is already configured, which is not an error — but it
+// is also not proof that Pages serves what we just pushed, so the existing
+// source is read back and returned. That read-back is best-effort: the site
+// bytes are already on gh-pages by this point, and a token without
+// pages:read must not fail the publish.
+func EnablePages(ctx context.Context, apiBase, repo, token string) (PagesStatus, error) {
 	if apiBase == "" {
 		apiBase = "https://api.github.com"
 	}
-	body := strings.NewReader(`{"build_type":"legacy","source":{"branch":"gh-pages","path":"/"}}`)
-	req, err := http.NewRequestWithContext(ctx, "POST",
-		strings.TrimSuffix(apiBase, "/")+"/repos/"+repo+"/pages", body)
+	endpoint := strings.TrimSuffix(apiBase, "/") + "/repos/" + repo + "/pages"
+	body := strings.NewReader(`{"build_type":"legacy","source":{"branch":"` + deployBranch + `","path":"/"}}`)
+	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, body)
 	if err != nil {
-		return err
+		return PagesStatus{}, err
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Accept", "application/vnd.github+json")
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return PagesStatus{}, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 	switch resp.StatusCode {
 	case http.StatusCreated:
-		return nil
-	case http.StatusConflict: // already enabled
-		return nil
+		return PagesStatus{Created: true, Branch: deployBranch, Path: "/"}, nil
+	case http.StatusConflict:
+		st, _ := readPagesConfig(ctx, client, endpoint, token)
+		return st, nil
 	default:
 		data, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return fmt.Errorf("enabling GitHub Pages for %s: HTTP %d: %s", repo, resp.StatusCode, bytes.TrimSpace(data))
+		return PagesStatus{}, fmt.Errorf("enabling GitHub Pages for %s: HTTP %d: %s", repo, resp.StatusCode, bytes.TrimSpace(data))
 	}
+}
+
+// readPagesConfig GETs the current Pages configuration.
+func readPagesConfig(ctx context.Context, client *http.Client, endpoint, token string) (PagesStatus, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+	if err != nil {
+		return PagesStatus{}, err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	resp, err := client.Do(req)
+	if err != nil {
+		return PagesStatus{}, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return PagesStatus{}, fmt.Errorf("reading Pages configuration: HTTP %d", resp.StatusCode)
+	}
+	var cfg struct {
+		HTMLURL string `json:"html_url"`
+		Source  struct {
+			Branch string `json:"branch"`
+			Path   string `json:"path"`
+		} `json:"source"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&cfg); err != nil {
+		return PagesStatus{}, err
+	}
+	return PagesStatus{Branch: cfg.Source.Branch, Path: cfg.Source.Path, URL: cfg.HTMLURL}, nil
 }
 
 func copyTree(src, dst string) error {

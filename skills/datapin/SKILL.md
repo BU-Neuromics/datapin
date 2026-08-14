@@ -275,6 +275,16 @@ datapin site publish [--github-token <tok>] [--out <dir>]      # build + push to
 `GH_TOKEN` → `gh auth token`; without one the push uses the git credential
 helper and the first-run Pages toggle is skipped with a note.
 
+### Man page
+
+```bash
+datapin man                          # roff man page on stdout
+datapin man --out man/datapin.1      # write to a file (--date for reproducible builds)
+```
+
+Generated from the live cobra tree, so it cannot drift from the CLI. Install it
+with `datapin man > /usr/local/share/man/man1/datapin.1`.
+
 ## Workspace remotes (cluster→laptop intermediate results)
 
 A dataset can also sync to a mutable **workspace** remote — no DOIs, no

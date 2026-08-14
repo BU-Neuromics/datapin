@@ -1,0 +1,37 @@
+# Citation File Format — https://citation-file-format.github.io
+# GitHub renders a "Cite this repository" button from this file.
+#
+# TODO before the next release: publish a datapin release to Zenodo (using
+# datapin) and add the resulting concept DOI here as `doi:` under
+# `identifiers:`, plus the badge in README.md. See issue #54 §5.
+cff-version: 1.2.0
+title: "datapin: pin, sync, and publish research data"
+message: "If you used datapin to publish or version research data, please cite it."
+type: software
+abstract: >-
+  datapin is a single-binary Go CLI for FAIR research-data publication. It
+  groups files into a dataset in a committed manifest and publishes them to an
+  archive repository (Zenodo or any InvenioRDM instance, Dataverse, Figshare)
+  as an immutable, versioned, DOI-carrying record — or syncs the same dataset
+  to a journal-versioned workspace remote (directory, S3, SFTP) when it is not
+  yet ready for a DOI. Every file is pinned to an exact version and checksum,
+  and any layer that can contradict that pin fails loudly rather than
+  delivering different bytes.
+authors:
+  - family-names: Labadorf
+    given-names: Adam
+    affiliation: Boston University
+  # orcid: "https://orcid.org/0000-0000-0000-0000"   # TODO: add
+repository-code: "https://github.com/BU-Neuromics/datapin"
+url: "https://github.com/BU-Neuromics/datapin#readme"
+license: MIT
+keywords:
+  - research data management
+  - FAIR data
+  - data publication
+  - DOI
+  - Zenodo
+  - InvenioRDM
+  - Dataverse
+  - data versioning
+  - reproducibility

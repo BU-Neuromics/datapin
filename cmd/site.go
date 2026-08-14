@@ -106,11 +106,14 @@ helper and the Pages toggle is skipped with a note.`,
 		}
 
 		pagesEnabled := false
+		var status site.PagesStatus
 		if repoSlug != "" && token != "" {
-			if err := site.EnablePages(cmd.Context(), os.Getenv("DATAPIN_GITHUB_API"), repoSlug, token); err != nil {
+			st, err := site.EnablePages(cmd.Context(), os.Getenv("DATAPIN_GITHUB_API"), repoSlug, token)
+			if err != nil {
 				log.Warnf("site pushed, but enabling GitHub Pages failed: %v — enable it once in the repo settings", err)
 			} else {
-				pagesEnabled = true
+				status, pagesEnabled = st, true
+				warnPagesSource(st, repoSlug)
 			}
 		} else if repoSlug != "" {
 			log.Infof("no GitHub token found — if this is the first publish, enable Pages (gh-pages branch) once in the repo settings")
@@ -119,11 +122,48 @@ helper and the Pages toggle is skipped with a note.`,
 		if flagOutput == "json" {
 			return output.PrintJSON(os.Stdout, map[string]any{
 				"remote": remoteURL, "branch": "gh-pages", "pages_enabled": pagesEnabled,
+				"pages_source_branch": status.Branch, "pages_serving_site": status.ServingSite(),
+				"pages_url": status.URL,
 			})
+		}
+		if status.URL != "" && status.ServingSite() {
+			log.Infof("✓ site published — %s", status.URL)
+			return nil
 		}
 		log.Infof("✓ site published")
 		return nil
 	},
+}
+
+// warnPagesSource says so out loud when Pages is switched on but serving
+// something other than the gh-pages branch the site was just pushed to.
+func warnPagesSource(st site.PagesStatus, repoSlug string) {
+	if msg := pagesSourceWarning(st, repoSlug); msg != "" {
+		log.Warnf("%s", msg)
+	}
+}
+
+// pagesSourceWarning returns the warning for a Pages configuration that
+// will not serve the published site, or "" when nothing is wrong. A source
+// we could not read is reported as unverified rather than as broken: the
+// bytes did land on gh-pages, and a token lacking pages:read is not a
+// misconfiguration.
+func pagesSourceWarning(st site.PagesStatus, repoSlug string) string {
+	switch {
+	case st.ServingSite():
+		return ""
+	case st.Branch == "":
+		return fmt.Sprintf("site pushed to gh-pages, but the GitHub Pages configuration could not be read — "+
+			"confirm Settings → Pages serves the gh-pages branch (root) for %s", repoSlug)
+	default:
+		src := st.Branch
+		if st.Path != "" && st.Path != "/" {
+			src += " " + st.Path
+		}
+		return fmt.Sprintf("site pushed to gh-pages, but GitHub Pages is serving %s instead — "+
+			"the published site will not appear until you change the source to the gh-pages branch (root) "+
+			"in Settings → Pages for %s", src, repoSlug)
+	}
 }
 
 // buildSite loads the manifest, gathers inputs, renders, and writes the

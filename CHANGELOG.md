@@ -15,6 +15,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Task guides and a troubleshooting reference** (#54), as plain markdown under
+  [`docs/`](./docs/) with an index in [`docs/README.md`](./docs/README.md): six
+  task-shaped walkthroughs (first DOI, publishing a new version, cluster→laptop
+  workspaces, leaving OSF, institutional InvenioRDM/Dataverse, scripting and CI)
+  and a reference covering every error datapin raises on purpose. Reference docs
+  were strong and everything around them was missing. The README keeps the
+  command reference and its Documentation section is now split into "for users"
+  and "for contributors" instead of pointing newcomers at the architecture plan.
+- **`datapin man`** generates a roff man page from the live cobra tree — HPC
+  users reach for `man`, and a single binary has nowhere to ship one from.
+  Generating it from the real command tree means it cannot drift from the CLI.
+  `--out` writes to a file, `--date` makes the output reproducible, and
+  `make man` writes `man/datapin.1`.
+- **`CITATION.cff`**, so GitHub renders a "Cite this repository" button. A tool
+  that mints DOIs for other people's data should be citable itself. (The
+  concept DOI for datapin's own Zenodo record is still to come.)
+- **Shell completion, uninstall, and the update check are documented.** All
+  three shipped and none appeared in the README: `datapin completion
+  bash|zsh|fish|powershell`, what to remove when uninstalling (including
+  keychain entries, via `remote rm` *before* deleting the binary), and
+  `DATAPIN_NO_UPDATE_CHECK`.
 - **`datapin status` reports the workspace track** (#57). A dataset row used to
   describe only its position relative to the *published* archive record, so the
   whole pre-publication phase — the cluster→laptop loop where collaboration
