@@ -256,7 +256,10 @@ known_hosts). Invariant, encoded as a test: every version datapin
 wrote is revertible. Commands: `push <slug>`, `pull <slug>
 --workspace`, `versions <slug>/<key>`, `revert <slug>/<key> --to N`,
 `gc --keep N`; dataset `workspace` field / `default_workspace` (D32);
-kind implies role (D33).
+kind implies role (D33). `internal/workspace/status.go` holds the
+read-only classifier `ClassifyKey(localMD5, headMD5, journal) KeyState`
+(the workspace analogue of `manifest.ClassifyFile`) plus `Journal`, the
+cheap accessor `status` uses instead of `Versions`.
 
 **Backward compat with gosf** (kept until migration completes): legacy
 `.gosf/gosf.toml` loads read-only (`Save` refuses with a migration hint),
@@ -300,6 +303,8 @@ datapin/
 │   ├── open.go
 │   ├── add.go               # datapin add — add entry to .datapin/datapin.toml
 │   ├── status.go            # datapin status — show manifest sync status
+│   ├── dataset_status.go    # dataset rows: archive state + workspace state
+│   ├── dataset_workspace_status.go # workspace half of a dataset row (#57)
 │   ├── sync.go              # datapin sync — push/pull; processPushEntry/processPullEntry gates
 │   ├── migrate.go           # datapin migrate — OSF exit ramp (GUID + manifest modes)
 │   ├── migrate_helpers.go   # pure migrate helpers (grouping, skeleton, TODOs, MIGRATED.md)
@@ -413,7 +418,7 @@ JSON goes to stdout; progress bars are suppressed in JSON mode.
 | `wiki mv` | `{node, from, to, dry_run}` |
 | `wiki versions` | same shape as `versions` |
 | `wiki add` | `{entries: [{local, page, project, version, md5}], manifest_created}` |
-| `status`/`sync` items | each carries `"kind": "file"\|"wiki"` |
+| `status`/`sync` items | each carries `"kind": "file"\|"wiki"\|"dataset"`; a dataset row with a workspace remote additionally carries `workspace_remote`, `workspace_state`, and per-key `workspace_files` (omitted otherwise — additive only) |
 
 ### Logging and verbosity (`internal/log`)
 
@@ -464,8 +469,41 @@ Everything from here to "Anonymous reads" describes the **frozen OSF surface**:
 schema-1 `[[files]]`/`[[wikis]]` entries, the L/B/R state machine, the gate
 matrix, and the OSF-specific rate-limit/scan optimizations. Datasets
 (`[[datasets]]`, schema 2) do not use any of it — their status states live in
-`cmd/dataset_status.go` and their transfer safety in the publish transaction and
-the pull pin gate (D41). Keep the two apart; do not grow the OSF side.
+`cmd/dataset_status.go` + `cmd/dataset_workspace_status.go` and their transfer
+safety in the publish transaction and the pull pin gate (D41). Keep the two
+apart; do not grow the OSF side.
+
+### Dataset status states (`[[datasets]]`, schema 2)
+
+A dataset row in `datapin status` reports **two independent states**, one per
+remote role (issue #57):
+
+- **Archive state** (`datasetState`, `cmd/dataset_gate.go`): position relative to
+  the published record — `NOT_PUBLISHED`, `IN_SYNC`, `MISSING`, `AHEAD`,
+  `REMOTE_NEWER`, `DIVERGED`. Aggregated over the file set from
+  `(published, localChanged, remoteNewer, localMissing)`.
+- **Workspace state** (`cmd/dataset_workspace_status.go`, `wsState*`
+  constants): position relative to the workspace remote's journal head —
+  `IN_SYNC`, `NOT_PUSHED`, `MISSING`, `BEHIND`, `AHEAD`, `DIVERGED`, `UNKNOWN`,
+  or `""` (no workspace remote / `--no-check-remote`). Per-key states come from
+  `workspace.ClassifyKey`; `aggregateWorkspaceState` collapses them to the one
+  row by precedence (both directions → `DIVERGED`, then push side, then pull
+  side), and `--output=json` keeps the per-key breakdown so nothing is lost.
+
+**There is no workspace baseline pin.** `[[datasets.files]].md5` is the
+*archive* pin: `publish` writes it, `push` never touches the manifest. So the
+workspace comparison is two-sided (local content vs head) with the journal
+supplying history — `BEHIND` is proved (local equals an older recorded version),
+while `AHEAD` asserts only "the workspace has not seen these bytes" and cannot
+be distinguished from a three-way divergence. Do not let a caller claim
+otherwise; name both remedies instead.
+
+**Exit code**: `workspaceStateIsInSync` decides whether the workspace half
+contributes to the non-zero exit. Real drift does; `NOT_PUSHED` does not (the
+workspace track is optional, so the absence of a copy is not work to do);
+`UNKNOWN` does (never vouch for a remote you could not read). A workspace that
+cannot be reached is a `log.Warnf`, not a failed run — `status` must still report
+the archive answer, the primary track.
 
 ### Schema
 

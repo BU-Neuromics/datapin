@@ -50,6 +50,18 @@ var statusCmd = &cobra.Command{
 
 		jsonMode := flagOutput == "json"
 		allInSync := true
+		// The WORKSPACE column only appears when a dataset can fill it, so a
+		// legacy OSF-only manifest keeps exactly the table it had. mkRow
+		// keeps every row the same width whichever way that goes.
+		showWorkspace := statusShowsWorkspaceColumn(m, statusNoCheckRemote)
+		mkRow := func(status output.Cell, path, ver string, ws output.Cell, detail output.Cell) []output.Cell {
+			cells := []output.Cell{status, {Text: path}, {Text: ver}}
+			if showWorkspace {
+				cells = append(cells, ws)
+			}
+			return append(cells, detail)
+		}
+		noWorkspaceCell := output.Cell{Text: ""}
 
 		jsonItems := make([]output.StatusItem, 0)
 		var rows [][]output.Cell
@@ -112,12 +124,11 @@ var statusCmd = &cobra.Command{
 				jsonItems = append(jsonItems, buildStatusItem(r.entry, r.state, r.remoteVersions))
 			} else {
 				statusStr, detail := stateDisplay(r.state, r.entry, r.remoteVersions)
-				rows = append(rows, []output.Cell{
-					{Text: statusStr, Style: stateStyle(r.state)},
-					{Text: r.entry.Local},
-					{Text: verLabel(r.entry.Version)},
-					{Text: detail, Style: output.Dim},
-				})
+				rows = append(rows, mkRow(
+					output.Cell{Text: statusStr, Style: stateStyle(r.state)},
+					r.entry.Local, verLabel(r.entry.Version), noWorkspaceCell,
+					output.Cell{Text: detail, Style: output.Dim},
+				))
 			}
 		}
 
@@ -152,12 +163,11 @@ var statusCmd = &cobra.Command{
 					} else {
 						detail = fmt.Sprintf("wiki %q — %s", we.Page, detail)
 					}
-					rows = append(rows, []output.Cell{
-						{Text: statusStr, Style: stateStyle(state)},
-						{Text: we.Local},
-						{Text: verLabel(we.Version)},
-						{Text: detail, Style: output.Dim},
-					})
+					rows = append(rows, mkRow(
+						output.Cell{Text: statusStr, Style: stateStyle(state)},
+						we.Local, verLabel(we.Version), noWorkspaceCell,
+						output.Cell{Text: detail, Style: output.Dim},
+					))
 				}
 			}
 		}
@@ -166,25 +176,32 @@ var statusCmd = &cobra.Command{
 		// rows: one publishable record = one row).
 		for i := range m.Datasets {
 			ds := &m.Datasets[i]
-			state, detail, err := datasetStatus(cmd.Context(), m, repoRoot, ds, statusNoCheckRemote)
+			res, err := datasetStatus(cmd.Context(), m, repoRoot, ds, statusNoCheckRemote)
 			if err != nil {
 				return err
 			}
-			if state != "IN_SYNC" {
+			// The two tracks are independent, so either one having work to do
+			// makes the run non-zero. Workspace states that only report the
+			// *absence* of an optional copy do not count — see
+			// workspaceStateIsInSync.
+			if res.State != "IN_SYNC" || !workspaceStateIsInSync(res.WorkspaceState) {
 				allInSync = false
 			}
 			if jsonMode {
 				jsonItems = append(jsonItems, output.StatusItem{
-					Path: ds.Slug, Kind: "dataset", State: state,
+					Path: ds.Slug, Kind: "dataset", State: res.State,
 					DeclaredVersion: ds.Version,
+					WorkspaceRemote: res.WorkspaceRemote,
+					WorkspaceState:  res.WorkspaceState,
+					WorkspaceFiles:  workspaceStatusFiles(res.WorkspaceKeys),
 				})
 			} else {
-				rows = append(rows, []output.Cell{
-					{Text: datasetStateGlyph(state), Style: datasetStateStyle(state)},
-					{Text: ds.Slug},
-					{Text: verLabel(ds.Version)},
-					{Text: detail, Style: output.Dim},
-				})
+				rows = append(rows, mkRow(
+					output.Cell{Text: datasetStateGlyph(res.State), Style: datasetStateStyle(res.State)},
+					ds.Slug, verLabel(ds.Version),
+					output.Cell{Text: workspaceStateGlyph(res.WorkspaceState), Style: workspaceStateStyle(res.WorkspaceState)},
+					output.Cell{Text: res.Detail, Style: output.Dim},
+				))
 			}
 		}
 
@@ -193,7 +210,11 @@ var statusCmd = &cobra.Command{
 				return err
 			}
 		} else {
-			output.RenderTable(os.Stdout, []string{"STATUS", "LOCAL PATH", "VER", "DETAIL"}, rows)
+			header := []string{"STATUS", "LOCAL PATH", "VER", "DETAIL"}
+			if showWorkspace {
+				header = []string{"STATUS", "LOCAL PATH", "VER", "WORKSPACE", "DETAIL"}
+			}
+			output.RenderTable(os.Stdout, header, rows)
 		}
 
 		if !allInSync {
