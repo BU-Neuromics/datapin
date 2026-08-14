@@ -113,7 +113,7 @@ fix after publishing:
   you. `CC0-1.0` (public domain dedication) is the conventional choice for
   research data and the one that scores best on reuse; `CC-BY-4.0` requires
   attribution. Whatever you choose, choose it deliberately — see
-  [the license gate](../troubleshooting/#publish-refuses-a-license-is-required)
+  [the license gate](../troubleshooting.md#publish-refuses-a-license-is-required)
   for why datapin refuses to guess.
 - **`creators`** are the people credited by the citation. `name` is
   `Family, Given`. Add ORCIDs: they are the difference between a citation that
@@ -168,7 +168,7 @@ know whether the data answers their question? Are the files the ones you meant,
 under names that mean something?
 
 `datapin cite counts` will render a citation locally here — sandbox DOIs
-[never resolve](../troubleshooting/#a-sandbox-doi-does-not-resolve), which is
+[never resolve](../troubleshooting.md#a-sandbox-doi-does-not-resolve), which is
 exactly what makes them safe to rehearse with.
 
 ## 5. Publish for real
@@ -227,10 +227,10 @@ Two DOIs come back, and the difference matters in a paper:
 
 ## What to do next
 
-- Data changed? → [Publishing a new version](../new-version/)
+- Data changed? → [Publishing a new version](./new-version.md)
 - Check how the record scores against FAIR: `datapin check --fair`
   (needs a resolving, non-sandbox DOI and an F-UJI server).
 - Give the dataset a human-readable home page:
   `datapin site build && datapin site preview`.
 - Publishing from a pipeline instead of by hand? →
-  [Scripting and CI](../automation/)
+  [Scripting and CI](./automation.md)

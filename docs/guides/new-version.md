@@ -178,5 +178,5 @@ in the manuscript, and publish for real when the paper is accepted.
 ## What to do next
 
 - Give each version a readable landing page: `datapin site build`.
-- Automate it from a pipeline → [Scripting and CI](../automation/)
-- Something else went wrong → [Troubleshooting](../troubleshooting/)
+- Automate it from a pipeline → [Scripting and CI](./automation.md)
+- Something else went wrong → [Troubleshooting](../troubleshooting.md)

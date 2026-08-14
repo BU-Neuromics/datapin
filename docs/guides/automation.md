@@ -220,5 +220,5 @@ a half-record. A job killed by the queue does not leave you a mess to reconcile.
 ## What to do next
 
 - Something failed and you want the meaning of the message →
-  [Troubleshooting](../troubleshooting/)
+  [Troubleshooting](../troubleshooting.md)
 - Teaching an AI coding agent the CLI: `npx skills add BU-Neuromics/datapin`

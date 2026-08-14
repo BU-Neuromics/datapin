@@ -23,7 +23,7 @@ authors:
     affiliation: Boston University
   # orcid: "https://orcid.org/0000-0000-0000-0000"   # TODO: add
 repository-code: "https://github.com/BU-Neuromics/datapin"
-url: "https://bu-neuromics.github.io/datapin/"
+url: "https://github.com/BU-Neuromics/datapin#readme"
 license: MIT
 keywords:
   - research data management

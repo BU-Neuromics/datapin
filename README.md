@@ -3,9 +3,8 @@
 [![CI](https://github.com/BU-Neuromics/datapin/actions/workflows/ci.yml/badge.svg)](https://github.com/BU-Neuromics/datapin/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/BU-Neuromics/datapin)](https://github.com/BU-Neuromics/datapin/releases)
 
-📖 **[Documentation and guides →](https://bu-neuromics.github.io/datapin/)** —
-task-shaped walkthroughs and a troubleshooting reference. (That site is built by
-`datapin site publish` from this repository's own manifest.)
+📖 **[Guides and troubleshooting →](./docs/README.md)** — task-shaped
+walkthroughs, and every error datapin raises on purpose.
 
 **Pin, sync, and publish research data.** `datapin` is a fast, single-binary
 CLI that publishes your data to a FAIR archive with a DOI — and, before it is
@@ -863,29 +862,27 @@ names every command and flag the CLI actually has.
 
 ### For users
 
-The [documentation site](https://bu-neuromics.github.io/datapin/) — generated
-from this repository by `datapin site publish` — holds the task-shaped material.
-This README is the command reference.
+This README is the command reference. The task-shaped material lives in
+[`docs/`](./docs/README.md) — plain markdown, read it here on GitHub or in your
+checkout:
 
-- [**Your first DOI**](https://bu-neuromics.github.io/datapin/first-doi/) —
+- [**Your first DOI**](./docs/guides/first-doi.md) —
   a results folder to a resolving DOI and a citation, rehearsed on a sandbox
-- [**Publishing a new version**](https://bu-neuromics.github.io/datapin/new-version/)
+- [**Publishing a new version**](./docs/guides/new-version.md)
   — what re-pins, what the concept DOI is for, when `--force` applies
-- [**Cluster to laptop**](https://bu-neuromics.github.io/datapin/workspace/) —
+- [**Cluster to laptop**](./docs/guides/workspace.md) —
   workspace remotes, credentials per kind, `revert` and `gc`
-- [**Leaving OSF**](https://bu-neuromics.github.io/datapin/leaving-osf/) —
+- [**Leaving OSF**](./docs/guides/leaving-osf.md) —
   both `migrate` modes and what to review before publishing
-- [**Institutional repositories**](https://bu-neuromics.github.io/datapin/institutional/)
+- [**Institutional repositories**](./docs/guides/institutional.md)
   — InvenioRDM and Dataverse: probing, `contact_email`, license vocabularies
-- [**Scripting and CI**](https://bu-neuromics.github.io/datapin/automation/) —
+- [**Scripting and CI**](./docs/guides/automation.md) —
   `--output=json`, `--yes`, exit codes, the token ladders
-- [**Troubleshooting**](https://bu-neuromics.github.io/datapin/troubleshooting/)
+- [**Troubleshooting**](./docs/troubleshooting.md)
   — every error datapin raises on purpose, and the command that resolves it
 - [`CHANGELOG.md`](./CHANGELOG.md) — what changed, per release
 
-The guide sources live under [`docs/`](./docs/) and are listed in
-[`.datapin/datapin.toml`](./.datapin/datapin.toml), so a fix is a pull request
-against a markdown file.
+A fix to any of them is a pull request against a markdown file.
 
 ### For contributors and project history
 

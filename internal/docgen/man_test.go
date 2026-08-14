@@ -65,6 +65,20 @@ func TestMan_Structure(t *testing.T) {
 	}
 }
 
+// SEE ALSO is the one place the page sends a reader elsewhere, so it must not
+// send them somewhere that does not exist. The guides are plain markdown in the
+// repository; there is no published documentation site to point at.
+func TestMan_SeeAlsoPointsAtDocumentationThatExists(t *testing.T) {
+	got := plain(string(docgen.Man(testTree(), "1.2.3", "2026-08-12")))
+
+	if strings.Contains(got, "bu-neuromics.github.io") {
+		t.Error("SEE ALSO must not advertise a documentation site that is not published")
+	}
+	if !strings.Contains(got, "https://github.com/BU-Neuromics/datapin/tree/main/docs") {
+		t.Error("SEE ALSO must point at the in-repo guides")
+	}
+}
+
 func TestMan_DocumentsEveryVisibleCommandAndFlag(t *testing.T) {
 	raw := string(docgen.Man(testTree(), "1.2.3", "2026-08-12"))
 	got := plain(raw) // what a reader sees, not the roff that produces it

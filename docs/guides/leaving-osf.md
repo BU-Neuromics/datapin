@@ -122,7 +122,7 @@ linter:
 
 1. **The license.** OSF did not record one in a form datapin can trust. Pick it
    deliberately — see
-   [the license gate](../troubleshooting/#publish-refuses-a-license-is-required).
+   [the license gate](../troubleshooting.md#publish-refuses-a-license-is-required).
 2. **Creator names and order.** OSF contributors become name-only creators.
    Citation order is the authorship question; fix it now, because a published
    version is immutable.
@@ -141,7 +141,7 @@ $ datapin check
 $ datapin publish <slug>
 ```
 
-Read [Your first DOI](../first-doi/) for the publish flow itself — and rehearse
+Read [Your first DOI](./first-doi.md) for the publish flow itself — and rehearse
 on the Zenodo sandbox first. A migrated dataset is exactly the case where a
 rehearsal pays: you are publishing metadata you did not write.
 
@@ -161,8 +161,8 @@ and `GOSF_*` environment variables still work with a deprecation warning.
 
 ## What to do next
 
-- The data is not ready for a DOI → [Cluster to laptop](../workspace/) puts it
+- The data is not ready for a DOI → [Cluster to laptop](./workspace.md) puts it
   on a workspace remote instead.
 - Publishing to your university's repository →
-  [Institutional repositories](../institutional/)
-- Something failed → [Troubleshooting](../troubleshooting/)
+  [Institutional repositories](./institutional.md)
+- Something failed → [Troubleshooting](../troubleshooting.md)

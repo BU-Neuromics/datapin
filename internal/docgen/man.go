@@ -72,7 +72,7 @@ func Man(root *cobra.Command, version, date string) []byte {
 	})
 
 	section(&b, "SEE ALSO")
-	b.WriteString("Full documentation and task guides: \\fBhttps://bu\\-neuromics.github.io/datapin/\\fR\n")
+	b.WriteString("Task guides and troubleshooting: \\fBhttps://github.com/BU\\-Neuromics/datapin/tree/main/docs\\fR\n")
 	b.WriteString(".PP\n")
 	b.WriteString("Source, issues, and the command reference: \\fBhttps://github.com/BU\\-Neuromics/datapin\\fR\n")
 

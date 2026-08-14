@@ -12,12 +12,12 @@ Find your message below. Each entry says what it means, why datapin is strict
 about it, and the one command that resolves it.
 
 - [Publish refuses: a license is required](#publish-refuses-a-license-is-required)
-- [Dataverse requires contact_email](#dataverse-requires-contact-email)
+- [Dataverse requires contact_email](#dataverse-requires-contact_email)
 - [A sandbox DOI does not resolve](#a-sandbox-doi-does-not-resolve)
-- [resource_type is not in the instance's vocabulary](#resource-type-is-not-in-the-instances-vocabulary)
+- [resource_type is not in the instance's vocabulary](#resource_type-is-not-in-the-instances-vocabulary)
 - [The license id is not offered by the target](#the-license-id-is-not-offered-by-the-target)
 - [`DIVERGED` — both sides moved](#diverged--both-sides-moved)
-- [`AHEAD_OF_MANIFEST` and a non-zero exit](#ahead-of-manifest-and-a-non-zero-exit)
+- [`AHEAD_OF_MANIFEST` and a non-zero exit](#ahead_of_manifest-and-a-non-zero-exit)
 - [A pinned pull fails on a checksum](#a-pinned-pull-fails-on-a-checksum)
 - [The remote has a newer version than the pin](#the-remote-has-a-newer-version-than-the-pin)
 - [Publish timed out but may have succeeded](#publish-timed-out-but-may-have-succeeded)

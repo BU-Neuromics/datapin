@@ -185,7 +185,7 @@ accordingly for large datasets.
 
 Dataverse locks a dataset during ingest and finalization. A publish arriving
 mid-lock is refused; the lock clears on its own. See
-[dataset is locked](../troubleshooting/#dataverse-dataset-is-locked).
+[dataset is locked](../troubleshooting.md#dataverse-dataset-is-locked).
 
 ## A caveat worth stating plainly
 
@@ -198,6 +198,6 @@ read what comes back, and check the landing page against what you expected.
 
 ## What to do next
 
-- The publish flow itself → [Your first DOI](../first-doi/)
-- Publishing from a pipeline → [Scripting and CI](../automation/)
-- An error you do not recognize → [Troubleshooting](../troubleshooting/)
+- The publish flow itself → [Your first DOI](./first-doi.md)
+- Publishing from a pipeline → [Scripting and CI](./automation.md)
+- An error you do not recognize → [Troubleshooting](../troubleshooting.md)

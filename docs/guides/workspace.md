@@ -179,10 +179,10 @@ $ datapin publish counts     # → DOI
 ```
 
 The workspace history stays where it is. Read
-[Your first DOI](../first-doi/) for the metadata you will need.
+[Your first DOI](./first-doi.md) for the metadata you will need.
 
 ## What to do next
 
-- Publishing the finished version → [Your first DOI](../first-doi/)
-- Driving this from a job script → [Scripting and CI](../automation/)
-- A push or pull failed → [Troubleshooting](../troubleshooting/)
+- Publishing the finished version → [Your first DOI](./first-doi.md)
+- Driving this from a job script → [Scripting and CI](./automation.md)
+- A push or pull failed → [Troubleshooting](../troubleshooting.md)
