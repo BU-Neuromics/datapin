@@ -180,3 +180,41 @@ func TestEmptyTransferSlicesAreArraysNotNull(t *testing.T) {
 		t.Errorf("empty downloaded should serialise as [], got: %s", got)
 	}
 }
+
+// The status JSON contract is additive-only: the workspace fields added in
+// #57 must never appear for an entry that has no workspace, so every
+// existing consumer keeps seeing exactly the object it saw before.
+func TestStatusItemWorkspaceFieldsAreAdditive(t *testing.T) {
+	got := roundTrip(t, StatusItem{Path: "data/x.csv", Kind: "file", State: "IN_SYNC", DeclaredVersion: 2})
+	for k, want := range map[string]any{
+		"path": "data/x.csv", "kind": "file", "state": "IN_SYNC", "declared_version": float64(2),
+	} {
+		if got[k] != want {
+			t.Errorf("%s = %v, want %v", k, got[k], want)
+		}
+	}
+	for _, absent := range []string{"workspace_state", "workspace_remote", "workspace_files"} {
+		if _, ok := got[absent]; ok {
+			t.Errorf("%s must be omitted when unset, got %v", absent, got)
+		}
+	}
+
+	got = roundTrip(t, StatusItem{
+		Path: "counts", Kind: "dataset", State: "IN_SYNC", DeclaredVersion: 1,
+		WorkspaceRemote: "nas", WorkspaceState: "BEHIND",
+		WorkspaceFiles: []StatusWorkspaceFile{
+			{Local: "r/a.csv", Key: "a.csv", State: "BEHIND", Version: 3},
+		},
+	})
+	if got["workspace_remote"] != "nas" || got["workspace_state"] != "BEHIND" {
+		t.Errorf("workspace fields = %v", got)
+	}
+	files, ok := got["workspace_files"].([]any)
+	if !ok || len(files) != 1 {
+		t.Fatalf("workspace_files = %v", got["workspace_files"])
+	}
+	f := files[0].(map[string]any)
+	if f["key"] != "a.csv" || f["local"] != "r/a.csv" || f["state"] != "BEHIND" || f["version"] != float64(3) {
+		t.Errorf("workspace_files[0] = %v", f)
+	}
+}

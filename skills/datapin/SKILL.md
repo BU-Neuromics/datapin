@@ -311,7 +311,10 @@ datapin gc [--keep N]                     # reclaim archived versions (default: 
 
 ## Dataset status
 
-`datapin status` shows one row per dataset alongside the legacy file/wiki rows:
+`datapin status` shows one row per dataset alongside the legacy file/wiki rows.
+A dataset has two remotes, so its row carries **two independent states**.
+
+**STATUS — the archive track** (position against the published record):
 
 | State | Meaning |
 |-------|---------|
@@ -322,7 +325,36 @@ datapin gc [--keep N]                     # reclaim archived versions (default: 
 | `REMOTE_NEWER` | The archive has a newer version (`datapin pull <slug> --latest`) |
 | `DIVERGED` | Local changed AND the archive moved |
 
-In `--output=json` each row carries `"kind": "dataset"|"file"|"wiki"`.
+**WORKSPACE — the workspace track** (position against the workspace remote's
+journal head; the column appears only when a dataset resolves a workspace
+remote and `--no-check-remote` was not passed):
+
+| State | Meaning |
+|-------|---------|
+| `IN_SYNC` | Every file matches the workspace's current version |
+| `NOT_PUSHED` | A local file is not on the workspace (`datapin push <slug>`) |
+| `BEHIND` | Local content equals an *older* journaled version — someone pushed newer bytes (`datapin pull <slug> --workspace`) |
+| `MISSING` | The workspace has a file the local tree does not (`datapin pull <slug> --workspace`) |
+| `AHEAD` | Local content the workspace has never seen |
+| `DIVERGED` | Some files need pushing AND others need pulling — no single command reconciles the dataset |
+| `UNKNOWN` | The workspace could not be read (a warning, not a failed run — the archive answer is still reported) |
+
+There is no workspace baseline pin: `[[datasets.files]].md5` is the *archive*
+pin, written by `publish` and never by `push`. So `BEHIND` is proved from the
+journal, while `AHEAD` says only "the workspace has not seen these bytes" and
+cannot distinguish deliberate local work from a three-way divergence — the row
+names both remedies. Never tell a user which one it is.
+
+**Exit code**: `status` exits 0 only when there is nothing to do on either
+track. Workspace `BEHIND`/`MISSING`/`AHEAD`/`DIVERGED`/`UNKNOWN` all make it
+exit 1; `NOT_PUSHED` does not (the workspace track is optional, so the absence
+of a copy is not work to do).
+
+In `--output=json` each row carries `"kind": "dataset"|"file"|"wiki"`. A dataset
+row with a workspace remote additionally carries `workspace_remote`,
+`workspace_state`, and a per-key `workspace_files` array
+(`{local, key, state, version}`) — all three omitted when there is no workspace
+remote, so the pre-existing fields are unchanged for every consumer.
 
 ## Guided setup
 
@@ -634,6 +666,7 @@ datapin versions counts            # the chain, with the concept DOI stable acro
 datapin remote add sftp://me@cluster/scratch/proj --name hpc --kind sftp
 datapin push counts
 # on the laptop, after git pull
+datapin status                     # WORKSPACE reads BEHIND — the cluster pushed
 datapin pull counts --workspace
 # something went wrong in v3:
 datapin versions counts/counts.h5
@@ -654,9 +687,10 @@ datapin check                                  # must be clean before publish
 ### Check whether everything is in sync (CI)
 
 ```bash
-datapin status --no-check-remote   # fast: no remote API calls
-datapin status                     # full: checks the remote/archive too
-# exits 0 if everything is IN_SYNC, 1 otherwise
+datapin status --no-check-remote   # fast: no remote API calls at all
+datapin status                     # full: archive AND workspace remotes
+# exits 0 only when there is nothing to do on either track, 1 otherwise
+# (workspace NOT_PUSHED is the one non-in-sync state that does not fail it)
 datapin check                      # exits 1 while any metadata error remains
 ```
 

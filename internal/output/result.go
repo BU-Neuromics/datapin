@@ -74,12 +74,39 @@ type AddResult struct {
 }
 
 // StatusItem describes one manifest entry's state, emitted by `datapin status --output=json`.
+//
+// The first five fields are the original contract and never change meaning:
+// State is the entry's position relative to its *archive* record (or, for
+// a legacy OSF file/wiki, its OSF remote). The Workspace* fields are
+// additive (#57) and appear only on a dataset row whose dataset resolves a
+// workspace remote — the mutable, DOI-free track is a second, independent
+// axis, so it gets its own state rather than overloading State.
 type StatusItem struct {
 	Path                string `json:"path"`
-	Kind                string `json:"kind"` // "file" or "wiki"
+	Kind                string `json:"kind"` // "file", "wiki" or "dataset"
 	State               string `json:"state"`
 	DeclaredVersion     int    `json:"declared_version"`
 	RemoteLatestVersion int    `json:"remote_latest_version,omitempty"`
+
+	// WorkspaceRemote is the resolved workspace remote's name.
+	WorkspaceRemote string `json:"workspace_remote,omitempty"`
+	// WorkspaceState aggregates WorkspaceFiles: IN_SYNC, NOT_PUSHED,
+	// MISSING, BEHIND, AHEAD, DIVERGED, or UNKNOWN when the workspace
+	// could not be read.
+	WorkspaceState string `json:"workspace_state,omitempty"`
+	// WorkspaceFiles is the per-key breakdown the row's single state
+	// aggregates, so a script never has to accept the aggregation.
+	WorkspaceFiles []StatusWorkspaceFile `json:"workspace_files,omitempty"`
+}
+
+// StatusWorkspaceFile is one dataset file's standing against the workspace
+// remote. Version is the journal sequence number of the workspace's
+// current version (0 when the key has no journal there).
+type StatusWorkspaceFile struct {
+	Local   string `json:"local"`
+	Key     string `json:"key"`
+	State   string `json:"state"`
+	Version int    `json:"version,omitempty"`
 }
 
 // SyncItem describes the action taken for one manifest entry, emitted by `datapin sync --output=json`.

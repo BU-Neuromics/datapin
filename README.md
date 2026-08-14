@@ -456,9 +456,53 @@ revertible** — until `datapin gc` reclaims it.
   over a tracked file, the foreign bytes are archived under their own content
   address before the push proceeds, and the event records the fact.
 
-`datapin status` shows dataset rows alongside files, so one command covers both
-tracks: `NOT_PUBLISHED`, `IN_SYNC`, `MISSING`, `AHEAD` (local changes since the
-published version), `REMOTE_NEWER` (the archive moved), `DIVERGED`.
+### Where am I? `datapin status` on both tracks
+
+A dataset has two remotes with two different jobs, so its `datapin status` row
+reports **two independent states** — one per track.
+
+```console
+$ datapin status
+STATUS  LOCAL PATH  VER  WORKSPACE  DETAIL
+✓       counts      v2   BEHIND     dataset — published as v2 · workspace "nas": 1 file(s) behind — newer bytes were pushed (datapin pull counts --workspace)
+```
+
+- **STATUS** is the **archive** state: where the dataset stands against its
+  published record — `NOT_PUBLISHED`, `IN_SYNC`, `MISSING`, `AHEAD` (local
+  changes since the published version), `REMOTE_NEWER` (the archive moved),
+  `DIVERGED`.
+- **WORKSPACE** is the **workspace** state: where your local files stand against
+  the workspace remote's journal head. This is the pre-publication answer — "am
+  I current with what my collaborators pushed?"
+
+| WORKSPACE | Meaning |
+|-----------|---------|
+| `IN_SYNC` | every file matches the workspace's current version |
+| `NOT_PUSHED` | at least one local file is not on the workspace → `datapin push <slug>` |
+| `BEHIND` | your copy matches an *older* journaled version — someone pushed newer bytes → `datapin pull <slug> --workspace` |
+| `MISSING` | the workspace has a file you do not → `datapin pull <slug> --workspace` |
+| `AHEAD` | local content the workspace has never seen |
+| `DIVERGED` | some files need pushing **and** others need pulling, so no single command reconciles the dataset |
+| `UNKNOWN` | the workspace could not be read (unmounted share, missing remote). A warning, not a failed run — the archive answer is still reported |
+
+The workspace comparison is **content against the journal**, not against a pin:
+`[[datasets.files]].md5` is the *archive* pin, written by `publish` and never by
+`push`. So `AHEAD` means "the workspace has not seen these bytes" and cannot, on
+its own, tell deliberate local work from a three-way divergence — the row names
+both remedies rather than guessing.
+
+**Exit code.** `datapin status` still exits 0 only when there is nothing to do,
+and workspace drift (`BEHIND`, `MISSING`, `AHEAD`, `DIVERGED`, `UNKNOWN`) now
+counts. `NOT_PUSHED` does **not**: the workspace track is optional, so a dataset
+that simply never used its workspace keeps exiting as it did before. Pass
+`--no-check-remote` to skip every remote lookup, workspace included — the
+`WORKSPACE` column then does not appear at all, as it also does not for a
+dataset with no workspace remote.
+
+The workspace check costs one head read per tracked file, and reads a file's
+journal only when it actually drifted. On `dir` and `sftp` remotes a head read
+means hashing the object (neither can report a checksum cheaply), so
+`--no-check-remote` is the fast path on a slow link.
 
 ## Scripting with JSON
 
@@ -473,6 +517,21 @@ $ datapin versions counts --output=json
 $ datapin remote ls --output=json
 $ datapin status --output=json
 [{"path":"counts","kind":"dataset","state":"IN_SYNC","declared_version":2}]
+```
+
+`datapin status` emits one object per manifest entry. `path`, `kind`, `state`,
+`declared_version` and `remote_latest_version` are the stable contract and never
+change meaning — `state` is always the **archive** (or, for a legacy OSF entry,
+the OSF) state. A dataset row that resolves a workspace remote additionally
+carries `workspace_remote`, `workspace_state`, and a per-key `workspace_files`
+breakdown (`{local, key, state, version}`, where `version` is the workspace
+journal's current sequence number). Those three fields are **omitted entirely**
+when there is no workspace remote or `--no-check-remote` was passed, so the
+row a script saw before is byte-for-byte the row it still sees:
+
+```console
+$ datapin status --output=json | jq '.[] | select(.workspace_state=="BEHIND") | .path'
+"counts"
 ```
 
 In JSON mode there are no prompts, so the commands that write remote data need
@@ -611,7 +670,7 @@ error output. On HPC nodes without a keychain, `export OSF_TOKEN=…` is enough.
 |---------|--------------|
 | `datapin init <project-id>` | Create/update `.datapin/datapin.toml` with `[project].id` |
 | `datapin add <local> [<project>:]<remote>` | Track a file (or a directory, recursively) as a `[[files]]` entry; the remote path mirrors the local one if omitted |
-| `datapin status` | Sync state of every manifest entry (`--no-check-remote`, `--jobs`) |
+| `datapin status` | Sync state of every manifest entry, and of every dataset on both its archive and workspace track (`--no-check-remote`, `--jobs`) |
 | `datapin sync` | Reconcile every entry that has one correct action |
 | `datapin ls <project>[:<path>]` | List files and folders |
 | `datapin pull <project>[:<path>] [dest]` | Download a file or a folder tree |
