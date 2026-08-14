@@ -15,6 +15,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`datapin status` reports the workspace track** (#57). A dataset row used to
+  describe only its position relative to the *published* archive record, so the
+  whole pre-publication phase — the cluster→laptop loop where collaboration
+  actually happens — was invisible: a collaborator could push new results to the
+  shared NAS and `status` still printed `✓`. Each dataset row now carries a
+  second, independent state for its workspace remote, in a new `WORKSPACE`
+  column: `IN_SYNC`, `NOT_PUSHED`, `BEHIND` (someone pushed newer bytes),
+  `MISSING`, `AHEAD`, `DIVERGED` (files needing pushes *and* files needing
+  pulls, so no single command reconciles the dataset), or `UNKNOWN`.
+
+  The comparison is local content against the workspace journal head, because
+  there is no workspace baseline pin — `[[datasets.files]].md5` is the archive
+  pin, written by `publish` and never by `push`. `BEHIND` is therefore *proved*
+  from the journal (local content equals an older recorded version), while
+  `AHEAD` states only that the workspace has never seen these bytes and names
+  both remedies rather than guessing between local work and a three-way
+  divergence.
+
+  `--output=json` gains `workspace_remote`, `workspace_state`, and a per-key
+  `workspace_files` breakdown on dataset rows. The addition is strictly
+  additive: the existing `path`/`kind`/`state`/`declared_version`/
+  `remote_latest_version` fields keep their names and meanings, and the three
+  new fields are omitted entirely when a dataset has no workspace remote.
+  `--no-check-remote` suppresses the workspace probe along with the archive one
+  (and with it the new column). A dataset with no workspace remote does no
+  workspace I/O at all; a workspace that cannot be read is a warning on stderr,
+  not a failed run, so `status` still reports the archive answer.
+
 - **Per-instance capabilities for InvenioRDM remotes** (#20, D54–D56): `remote
   add` now probes what an instance declares about itself instead of assuming
   the Zenodo profile, and stores it under `[remotes.<name>.caps]` in
@@ -30,6 +58,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   transfer type — it falls back to a single PUT.
 
 ### Changed
+
+- **`datapin status` exit code now accounts for workspace drift** (#57).
+  `status` still exits 0 only when there is nothing to do, but "nothing to do"
+  now includes the workspace track: a dataset that is `BEHIND`, `MISSING`,
+  `AHEAD` or `DIVERGED` on its workspace remote — or whose workspace could not
+  be read (`UNKNOWN`) — makes the run exit 1. **This can newly fail a pipeline
+  that passes today.** Deliberately excluded: `NOT_PUSHED`. The workspace track
+  is optional (unlike publishing, which is a dataset's whole point), so the mere
+  *absence* of a workspace copy is not evidence of work to do, and a published
+  dataset that never used its workspace exits exactly as it did before. Pass
+  `--no-check-remote` for a local-only check that never consults either remote.
 
 - **Documentation now leads with archive publication, not OSF** (#40). README
   and the agent skill (`skills/datapin/SKILL.md`) were still OSF-first
